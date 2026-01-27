@@ -143,15 +143,15 @@ end module morse
 module gay_berne
     use system
     implicit none
-
-    public
-
-    real(8), dimension(3) :: U1, U2, RIJ, FIJ, TI, TJ, TORQ1, TORQ2
     
+    real(8), dimension(3), public :: U1, U2, RIJ, FIJ, TI, TJ, TORQ1, TORQ2
+    public :: gb_calculate_forces
+    
+    private
     real(8) :: meu = 1.0, neu = 2.0
     real(8) :: ru1, ru2, uu, chi, xhi, rij_sq, rij_mag
+    real(8) :: eps1, eps2, sr, sigma, sigma_0 = 1.0
 
-    ! public :: gb_calculate_forces
 
     contains
     function g_func( chie ) result (res)
@@ -161,8 +161,6 @@ module gay_berne
 
         term1 = (ru1 + ru2)**2 / (1 + chie * uu)
         term2 = (ru1 - ru2)**2 / (1 - chie * uu)
-
-        ! write(*, *) chie, uu, ru1, ru2, rij_sq, term1, term2
         
         res = 1 - (chie / 2.0 / rij_sq) * (term1 + term2)
 
@@ -209,7 +207,6 @@ module gay_berne
         integer, intent(in)     :: I, J
         real(8), dimension(3)   :: dR_dr, de2_dr, dR_du1, dR_du2
         real(8), dimension(3)   :: de1_du1, de2_du1, de1_du2, de2_du2
-        real(8)                 :: sr, sigma, eps1, eps2, sigma_0 = 1.0
         real(8)                 :: pot, vir
 
         RIJ(1) = RX(I) - RX(J)
@@ -254,17 +251,9 @@ module gay_berne
         dR_du2  = (12.0 * sr**7 - 12.0 * sr**13) * 0.5 * (rad(1) / sigma_0) * dG_du2( chi ) * g_func( chi ) ** (-3.0 / 2.0)
     
         pot = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - 2.0 * sr ** 6.0)
-        FIJ = (-1.0) * (eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_dr  + de2_dr * (sr**12 - 2.0*sr**6)
-        TI  = (-1.0) * (sr**12 - 2.0*sr**6) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * dR_du1)
-        TJ  = (-1.0) * (sr**12 - 2.0*sr**6) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * dR_du2)
-
-        ! write(*, *) RX(I), RY(I), RZ(I)
-        ! write(*, *) RX(J), RY(J), RZ(J)
-        ! write(*, *) RIJ, rij_sq, rij_mag
-        ! write(*, *) chi, xhi, eps1, eps2, sigma, sr
-        ! write(*, *) dR_dr, de2_dr, FIJ
-        ! write(*, *) dR_du1, de1_du1, de2_du1, TI
-        ! write(*, *) dR_du2, de1_du2, de2_du2, TJ
+        FIJ = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_dr  + de2_dr * (sr**12 - 2.0*sr**6))
+        TI  = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * dR_du1))
+        TJ  = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * dR_du2))
 
         potential_energy = potential_energy + pot
         virial = virial + dot( FIJ, RIJ )

@@ -22,8 +22,7 @@ module state_data_reporter
         integer, intent(in) :: unit, step
 
         write(unit, "(I5, 6(F20.10))") &
-        step, potential_energy / dble(N), kinetic_energy / dble(N), &
-        (potential_energy + kinetic_energy) / dble(N), temperature, pressure, density
+        step, potential_energy, kinetic_energy, total_energy, temperature, pressure, density
     
     end subroutine report_state_data
 
@@ -109,7 +108,7 @@ module config_reporter
         integer :: I
 
         do I = 1, N
-            write(unit, "(1x, 50f20.10)") RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I)
+            write(unit, "(1x, 50f20.10)") RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I), LX(I), LY(I), LZ(I), QW(I), QX(I), QY(I), QZ(I)
         enddo
 
     end subroutine report_confwriter

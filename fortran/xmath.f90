@@ -232,6 +232,22 @@ module xmath
 
     end function as_matrix
 
+    pure function rotation_matrix(quat) result (rot_matrix)
+        real, dimension(4), intent(in) :: quat
+        real, dimension(3, 3) :: rot_matrix
+
+        rot_matrix(1, 1) = quat(1) ** 2 + quat(2) ** 2 - quat(3) ** 2 - quat(4) ** 2
+        rot_matrix(1, 2) = 2.0 * ( quat(2) * quat(3) + quat(1) * quat(4) )
+        rot_matrix(1, 3) = 2.0 * ( quat(2) * quat(4) - quat(1) * quat(3) )
+        rot_matrix(2, 1) = 2.0 * ( quat(2) * quat(3) - quat(1) * quat(4) )
+        rot_matrix(2, 2) = quat(1) ** 2 - quat(2) ** 2 + quat(3) ** 2 - quat(4) ** 2
+        rot_matrix(2, 3) = 2.0 * ( quat(3) * quat(4) + quat(1) * quat(2) )
+        rot_matrix(3, 1) = 2.0 * ( quat(2) * quat(4) + quat(1) * quat(3) )
+        rot_matrix(3, 2) = 2.0 * ( quat(3) * quat(4) - quat(1) * quat(2) )
+        rot_matrix(3, 3) = quat(1) ** 2 - quat(2) ** 2 - quat(3) ** 2 + quat(4) ** 2
+
+    end function rotation_matrix
+
     pure function vvdot(a, b) result (out)
         implicit none
         real(8), intent(in), dimension(3) :: a, b

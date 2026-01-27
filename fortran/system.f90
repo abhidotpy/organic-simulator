@@ -4,13 +4,11 @@ module atom
     real(8) :: mass, charge
     real(8), dimension(3) :: rad, erad, exc_rad, MOI
 
-
     real(8), allocatable, dimension(:) :: RX, RY, RZ
     real(8), allocatable, dimension(:) :: VX, VY, VZ
     real(8), allocatable, dimension(:) :: FX, FY, FZ
 
     real(8), allocatable, dimension(:) :: QW, QX, QY, QZ
-    real(8), allocatable, dimension(:) :: WX, WY, WZ
     real(8), allocatable, dimension(:) :: LX, LY, LZ
     real(8), allocatable, dimension(:) :: TX, TY, TZ
 
@@ -37,7 +35,6 @@ module system
     real(8) :: temperature, pressure, density, virial
     
     logical :: default_mass = .TRUE., default_charge=.TRUE.
-    logical ::rotations_enabled = .FALSE.
     logical :: box_lengths_set = .FALSE.
     logical :: num_atoms_set = .FALSE.
     logical :: density_set = .FALSE.
@@ -51,18 +48,24 @@ module system
         integer, intent(in) :: num_atoms
 
         N = num_atoms
-        dof = 3 * N
+        dof = 6 * N
         num_atoms_set = .TRUE.
 
         allocate( RX(N), RY(N), RZ(N) )
         allocate( VX(N), VY(N), VZ(N) )
         allocate( FX(N), FY(N), FZ(N) )
+        allocate( LX(N), LY(N), LZ(N) )
+        allocate( TX(N), TY(N), TZ(N) )
+        allocate( QW(N), QX(N), QY(N), QZ(N) )
 
         RX = 0.0; RY = 0.0; RZ = 0.0
         VX = 0.0; VY = 0.0; VZ = 0.0
         FX = 0.0; FY = 0.0; FZ = 0.0
+        LX = 0.0; LY = 0.0; LZ = 0.0
+        TX = 0.0; TY = 0.0; TZ = 0.0
+        QW = 1.0; QX = 0.0; QY = 0.0; QZ = 0.0
 
-        rad = 1.0; exc_rad = 1.0;
+        rad = 1.0; exc_rad = 1.0; erad = 1.0
 
     end subroutine set_num_atoms
 
@@ -89,9 +92,9 @@ module system
         rad(2) = width
         rad(3) = height
 
-        MOI(1) = rad(2)**2 + rad(3)**2 / 20.0
-        MOI(2) = rad(1)**2 + rad(3)**2 / 20.0
-        MOI(3) = rad(1)**2 + rad(2)**2 / 20.0
+        MOI(1) = (rad(2)**2 + rad(3)**2) / 20.0
+        MOI(2) = (rad(1)**2 + rad(3)**2) / 20.0
+        MOI(3) = (rad(1)**2 + rad(2)**2) / 20.0
 
         exc_rad = max( length, width, height )
     
@@ -184,25 +187,9 @@ module system
         VY = VY - vy_com
         VZ = VZ - vz_com
 
+        dof = dof - 3
+
     end subroutine set_velocty_to_temperature
-
-    subroutine set_rotational_dof()
-        implicit none
-
-        rotations_enabled = .TRUE.
-        dof = dof + 3 * N
-
-        allocate( QW(N), QX(N), QY(N), QZ(N) )
-        allocate( WX(N), WY(N), WZ(N) )
-        allocate( LX(N), LY(N), LZ(N) )
-        allocate( TX(N), TY(N), TZ(N) )
-
-        QW = 1.0; QX = 0.0; QY = 0.0; QZ = 0.0
-        WX = 0.0; WY = 0.0; WZ = 0.0
-        LX = 0.0; LY = 0.0; LZ = 0.0
-        TX = 0.0; TY = 0.0; TZ = 0.0
-
-    end subroutine set_rotational_dof
 
     subroutine initialize_forces
         implicit none
@@ -221,7 +208,7 @@ module system
         implicit none
         integer, intent(in) :: unit_cells
         integer :: num_atoms, mtemp, I, J, K, IREF
-        real    :: cell, half_cell
+        real(8)    :: cell, half_cell, rroot3
 
         fcc_lattice_generated = .TRUE.
         num_atoms = 4 * unit_cells ** 3
@@ -245,22 +232,39 @@ module system
 
         cell = box_length / real(unit_cells)
         half_cell = cell / 2.0
+        rroot3 = 1.0 / sqrt(3.0)
 
         RX(1) = 0.0
         RY(1) = 0.0
         RZ(1) = 0.0
+        QW(1) = sqrt( ( 1.0 + rroot3 ) / 2.0 )
+        QX(1) = sqrt( ( 1.0 - rroot3 ) / 2.0 ) * (  rroot3 / sqrt( 1.0 - rroot3 ** 2.0 ) )
+        QY(1) = sqrt( ( 1.0 - rroot3 ) / 2.0 ) * ( -rroot3 / sqrt( 1.0 - rroot3 ** 2.0 ) )
+        QZ(1) = 0.0
 
         RX(2) = half_cell
         RY(2) = half_cell
         RZ(2) = 0.0
+        QW(2) = sqrt( ( 1.0 - rroot3 ) / 2.0 )
+        QX(2) = sqrt( ( 1.0 + rroot3 ) / 2.0 ) * ( -rroot3 / sqrt( 1.0 - rroot3 ** 2.0 ) )
+        QY(2) = sqrt( ( 1.0 + rroot3 ) / 2.0 ) * ( -rroot3 / sqrt( 1.0 - rroot3 ** 2.0 ) )
+        QZ(2) = 0.0
 
         RX(3) = 0.0
         RY(3) = half_cell
         RZ(3) = half_cell
+        QW(3) = sqrt( ( 1.0 - rroot3 ) / 2.0 )
+        QX(3) = sqrt( ( 1.0 + rroot3 ) / 2.0 ) * (  rroot3 / sqrt( 1.0 - rroot3 ** 2.0 ) )
+        QY(3) = sqrt( ( 1.0 + rroot3 ) / 2.0 ) * (  rroot3 / sqrt( 1.0 - rroot3 ** 2.0 ) )
+        QZ(3) = 0.0
 
         RX(4) = half_cell
         RY(4) = 0.0
         RZ(4) = half_cell
+        QW(4) = sqrt( ( 1.0 + rroot3 ) / 2.0 )
+        QX(4) = sqrt( ( 1.0 - rroot3 ) / 2.0 ) * ( -rroot3 / sqrt( 1.0 - rroot3 ** 2.0 ) )
+        QY(4) = sqrt( ( 1.0 - rroot3 ) / 2.0 ) * (  rroot3 / sqrt( 1.0 - rroot3 ** 2.0 ) )
+        QZ(4) = 0.0
 
         mtemp = 0
         do I = 1, unit_cells
@@ -271,6 +275,11 @@ module system
                         RX( IREF + MTEMP ) = RX( IREF ) + cell * ( I - 1 )
                         RY( IREF + MTEMP ) = RY( IREF ) + cell * ( J - 1 )
                         RZ( IREF + MTEMP ) = RZ( IREF ) + cell * ( K - 1 )
+
+                        QW( IREF + MTEMP ) = QW( IREF )
+                        QX( IREF + MTEMP ) = QX( IREF )
+                        QY( IREF + MTEMP ) = QY( IREF )
+                        QZ( IREF + MTEMP ) = QZ( IREF )
 
                     enddo
                     mtemp = mtemp + 4
@@ -321,12 +330,6 @@ module system
         else
             write(*, "(1x, 'Periodic boundary conditions disabled for current system')")
         endif
-        
-        if (rotations_enabled) then
-            write(*, "(1x, 'Rotational degrees of freedom enabled for current system')")
-        else
-            write(*, "(1x, 'Rotational degrees of freedom disabled for current system')")
-        endif
 
         if (default_mass) then
             mass = 1.0
@@ -349,32 +352,6 @@ module system
 
     end subroutine initialize_system
 
-    subroutine calculate_kinetic_energy()
-        implicit none
-        integer :: I
-
-        kinetic_energy = 0.5 * mass * SUM( VX ** 2 + VY ** 2 + VZ ** 2 )
-    end subroutine calculate_kinetic_energy
-
-    subroutine calculate_temperature()
-        implicit none
-    
-        temperature = 0.0
-        if (kinetic_energy > 0.0) then
-            temperature = 2.0 * kinetic_energy / dble(dof)
-        endif
-    
-    end subroutine calculate_temperature
-
-    subroutine calculate_pressure()
-        implicit none
-
-        if (box_lengths_set .and. volume > 0.0 .and. temperature > 0.0) then
-            pressure = (density * temperature) + (virial / volume)
-        endif
-    
-    end subroutine calculate_pressure
-
     subroutine calculate_state_variables()
         implicit none
 
@@ -390,7 +367,6 @@ module system
         potential_energy = potential_energy / dble(N)
         kinetic_energy = kinetic_energy / dble(N)
         total_energy = total_energy / dble(N)
-
 
     end subroutine calculate_state_variables
 
