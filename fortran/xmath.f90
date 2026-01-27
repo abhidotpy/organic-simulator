@@ -110,11 +110,12 @@ module xmath
         module procedure vmdot
         module procedure mvdot
         module procedure mmdot
+        module procedure quat_vec_product
     end interface
 
     interface operator(*)
         module procedure quat_product
-        module procedure quat_vec_product
+        module procedure scalar_quat_product
     end interface
 
     contains
@@ -297,14 +298,28 @@ module xmath
     pure function quat_vec_product(a, b) result (out)
         implicit none
         type(Quaternion), intent(in) :: a
-        real(8), intent(in), dimension(3) :: b
-        real(8), dimension(3) :: out
+        real(8), dimension(3), intent(in) :: b
+        type(Quaternion) :: out
 
-        out(1) = a % q(1) * b(1) + a % q(2) * b(2) + a % q(3) * b(3)
-        out(2) = a % q(2) * b(1) - a % q(1) * b(2) - a % q(4) * b(3)
-        out(3) = a % q(3) * b(1) + a % q(4) * b(2) - a % q(1) * b(3)
+        out % q(1) = - a % q(2) * b(1) - a % q(3) * b(2) - a % q(4) * b(3)
+        out % q(2) =   a % q(1) * b(1) + a % q(3) * b(3) - a % q(4) * b(2)
+        out % q(3) =   a % q(1) * b(2) - a % q(2) * b(3) + a % q(4) * b(1)
+        out % q(4) =   a % q(1) * b(3) + a % q(2) * b(2) - a % q(3) * b(1)
 
     end function quat_vec_product
+
+    pure function scalar_quat_product(scalar, quat) result (out)
+        implicit none
+        real(8), intent(in) :: scalar
+        type(Quaternion), intent(in) :: quat
+        type(Quaternion) :: out
+
+        out % q(1) = scalar * quat % q(1)
+        out % q(2) = scalar * quat % q(2)
+        out % q(3) = scalar * quat % q(3)
+        out % q(4) = scalar * quat % q(4)
+
+    end function scalar_quat_product
 
     pure function degrees_to_radians(angle) result (out)
         implicit none
