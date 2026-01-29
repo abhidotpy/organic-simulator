@@ -21,7 +21,7 @@ module state_data_reporter
         implicit none
         integer, intent(in) :: unit, step
 
-        write(unit, "(I5, 6(F20.10))") &
+        write(unit, "(I5, 50F20.10)") &
         step, potential_energy, kinetic_energy, total_energy, temperature, pressure, density
     
     end subroutine report_state_data

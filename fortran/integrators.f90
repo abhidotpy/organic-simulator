@@ -42,13 +42,17 @@ module quaternion_integrator
     implicit none
 
     real(8), dimension(3, 3), private :: RM
+    real(8) :: QDW, QDX, QDY, QDZ
+    real(8) :: LX_body, LY_body, LZ_body
+    real(8) :: WX_body, WY_body, WZ_body
 
     contains
-     subroutine qq_initial_step( DT )
+    subroutine qq_initial_step( DT )
         implicit none
         real(8), intent(in) :: DT
-        real(8) :: QW_Old, QX_Old, QY_Old, QZ_Old, QW_New, QX_New, QY_New, QZ_New
-        real(8) :: QDW, QDX, QDY, QDZ, WX_body, WY_body, WZ_body
+        real(8) :: QW_Old, QX_Old, QY_Old, QZ_Old
+        real(8) :: QW_New, QX_New, QY_New, QZ_New
+        real(8) :: Q_mag
         integer :: I, J
 
         do I = 1, N
@@ -59,7 +63,7 @@ module quaternion_integrator
             LY(I) = LY(I) + 0.5 * DT * TY(I)
             LZ(I) = LZ(I) + 0.5 * DT * TZ(I)
 
-            do J = 1, 3
+            do J = 1, 2
                 QW_Old = QW_New; QX_Old = QX_New
                 QY_Old = QY_New; QZ_Old = QZ_New
                 
@@ -86,13 +90,19 @@ module quaternion_integrator
                 QX_New = QX(I) + 0.5 * DT * QDX
                 QY_New = QY(I) + 0.5 * DT * QDY
                 QZ_New = QZ(I) + 0.5 * DT * QDZ
-            
+                
             enddo
 
             QW(I) = QW(I) + DT * QDW
             QX(I) = QX(I) + DT * QDX
             QY(I) = QY(I) + DT * QDY
             QZ(I) = QZ(I) + DT * QDZ
+
+            Q_mag = SQRT( QW(I)**2 + QX(I)**2 + QY(I)**2 + QZ(I)**2 )
+            QW(I) = QW(I) / Q_mag
+            QX(I) = QX(I) / Q_mag
+            QY(I) = QY(I) / Q_mag
+            QZ(I) = QZ(I) / Q_mag
 
         enddo
 
@@ -101,8 +111,6 @@ module quaternion_integrator
     subroutine qq_final_step( DT )
         implicit none
         real(8), intent(in) :: DT
-        real(8) :: LX_body, LY_body, LZ_body
-        real(8) :: WX_body, WY_body, WZ_body
         integer :: I
 
         do I = 1, N
@@ -111,17 +119,23 @@ module quaternion_integrator
             LY(I) = LY(I) + 0.5 * DT * TY(I)
             LZ(I) = LZ(I) + 0.5 * DT * TZ(I)
 
-            ! LXB = ( RM(1,1) * LX(I) + RM(1,2) * LY(I) + RM(1,3) * LZ(I) )
-            ! LYB = ( RM(2,1) * LX(I) + RM(2,2) * LY(I) + RM(2,3) * LZ(I) )
-            ! LZB = ( RM(3,1) * LX(I) + RM(3,2) * LY(I) + RM(3,3) * LZ(I) )
+            RM(1, 1) = QW(I)**2 + QX(I)**2 - QY(I)**2 - QZ(I)**2
+            RM(1, 2) = 2.0 * ( QX(I) * QY(I) + QW(I) * QZ(I) )
+            RM(1, 3) = 2.0 * ( QX(I) * QZ(I) - QW(I) * QY(I) )
+            RM(2, 1) = 2.0 * ( QX(I) * QY(I) - QW(I) * QZ(I) )
+            RM(2, 2) = QW(I)**2 - QX(I)**2 + QY(I)**2 - QZ(I)**2
+            RM(2, 3) = 2.0 * ( QY(I) * QZ(I) + QW(I) * QX(I) )
+            RM(3, 1) = 2.0 * ( QX(I) * QZ(I) + QW(I) * QY(I) )
+            RM(3, 2) = 2.0 * ( QY(I) * QZ(I) - QW(I) * QX(I) )
+            RM(3, 3) = QW(I)**2 - QX(I)**2 - QY(I)**2 + QZ(I)**2
 
-            WX_body = ( RM(1,1) * LX(I) + RM(1,2) * LY(I) + RM(1,3) * LZ(I) ) / MOI(1)
-            WY_body = ( RM(2,1) * LX(I) + RM(2,2) * LY(I) + RM(2,3) * LZ(I) ) / MOI(2)
-            WZ_body = ( RM(3,1) * LX(I) + RM(3,2) * LY(I) + RM(3,3) * LZ(I) ) / MOI(3)
+            LX_body = ( RM(1,1) * LX(I) + RM(1,2) * LY(I) + RM(1,3) * LZ(I) )
+            LY_body = ( RM(2,1) * LX(I) + RM(2,2) * LY(I) + RM(2,3) * LZ(I) )
+            LZ_body = ( RM(3,1) * LX(I) + RM(3,2) * LY(I) + RM(3,3) * LZ(I) )
 
-            kinetic_energy = kinetic_energy + 0.5 * (( WX_body ** 2.0 ) * MOI(1) + &
-                                                     ( WY_body ** 2.0 ) * MOI(2) + &
-                                                     ( WZ_body ** 2.0 ) * MOI(3) )
+            kinetic_energy = kinetic_energy + 0.5 * ( ( LX_body ** 2.0) / MOI(1) + &
+                                                      ( LY_body ** 2.0) / MOI(2) + &
+                                                      ( LZ_body ** 2.0) / MOI(3) )
 
         enddo
 

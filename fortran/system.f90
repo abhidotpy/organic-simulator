@@ -65,8 +65,6 @@ module system
         TX = 0.0; TY = 0.0; TZ = 0.0
         QW = 1.0; QX = 0.0; QY = 0.0; QZ = 0.0
 
-        rad = 1.0; exc_rad = 1.0; erad = 1.0
-
     end subroutine set_num_atoms
 
     subroutine set_density( target_density )
