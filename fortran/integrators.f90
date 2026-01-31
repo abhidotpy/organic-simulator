@@ -42,9 +42,9 @@ module quaternion_integrator
     implicit none
 
     real(8), dimension(3, 3), private :: RM
-    real(8) :: QDW, QDX, QDY, QDZ
-    real(8) :: LX_body, LY_body, LZ_body
-    real(8) :: WX_body, WY_body, WZ_body
+    real(8), private :: QDW, QDX, QDY, QDZ
+    real(8), private :: LX_body, LY_body, LZ_body
+    real(8), private :: WX_body, WY_body, WZ_body
 
     contains
     subroutine qq_initial_step( DT )
@@ -85,12 +85,12 @@ module quaternion_integrator
                 QDX = 0.5 * (   QW_Old * WX_body + QY_Old * WZ_body - QZ_Old * WY_body )
                 QDY = 0.5 * (   QW_Old * WY_body - QX_Old * WZ_body + QZ_Old * WX_body )
                 QDZ = 0.5 * (   QW_Old * WZ_body + QX_Old * WY_body - QY_Old * WX_body )
-                
+
                 QW_New = QW(I) + 0.5 * DT * QDW
                 QX_New = QX(I) + 0.5 * DT * QDX
                 QY_New = QY(I) + 0.5 * DT * QDY
                 QZ_New = QZ(I) + 0.5 * DT * QDZ
-                
+            
             enddo
 
             QW(I) = QW(I) + DT * QDW
@@ -140,7 +140,6 @@ module quaternion_integrator
         enddo
 
     end subroutine qq_final_step
-
 
 end module quaternion_integrator
     

@@ -9,6 +9,7 @@ module atom
     real(8), allocatable, dimension(:) :: FX, FY, FZ
 
     real(8), allocatable, dimension(:) :: QW, QX, QY, QZ
+    real(8), allocatable, dimension(:) :: WX, WY, WZ
     real(8), allocatable, dimension(:) :: LX, LY, LZ
     real(8), allocatable, dimension(:) :: TX, TY, TZ
 
@@ -31,10 +32,11 @@ module system
 
     integer :: N, dof
     
-    real(8) :: potential_energy, kinetic_energy, total_energy
+    real(8) :: potential_energy, kinetic_energy, rkinetic_energy, total_energy
     real(8) :: temperature, pressure, density, virial
     
     logical :: default_mass = .TRUE., default_charge=.TRUE.
+    logical ::rotations_enabled = .FALSE.
     logical :: box_lengths_set = .FALSE.
     logical :: num_atoms_set = .FALSE.
     logical :: density_set = .FALSE.
@@ -57,6 +59,7 @@ module system
         allocate( LX(N), LY(N), LZ(N) )
         allocate( TX(N), TY(N), TZ(N) )
         allocate( QW(N), QX(N), QY(N), QZ(N) )
+        allocate( WX(N), WY(N), WZ(N) )
 
         RX = 0.0; RY = 0.0; RZ = 0.0
         VX = 0.0; VY = 0.0; VZ = 0.0
@@ -64,6 +67,7 @@ module system
         LX = 0.0; LY = 0.0; LZ = 0.0
         TX = 0.0; TY = 0.0; TZ = 0.0
         QW = 1.0; QX = 0.0; QY = 0.0; QZ = 0.0
+        Wx = 0.0; Wy = 0.0; Wz = 0.0
 
     end subroutine set_num_atoms
 
@@ -197,6 +201,7 @@ module system
 
         potential_energy = 0.0
         kinetic_energy = 0.0
+        rkinetic_energy = 0.0
         temperature = 0.0
         pressure = 0.0
         virial = 0.0
@@ -354,7 +359,7 @@ module system
         implicit none
 
         kinetic_energy = kinetic_energy + 0.5 * mass * SUM( VX ** 2 + VY ** 2 + VZ ** 2 )
-        total_energy = potential_energy + kinetic_energy
+        total_energy = potential_energy + kinetic_energy + rkinetic_energy
 
         temperature = 2.0 * kinetic_energy / dble(dof)
 
@@ -364,6 +369,7 @@ module system
 
         potential_energy = potential_energy / dble(N)
         kinetic_energy = kinetic_energy / dble(N)
+        rkinetic_energy = rkinetic_energy / dble(N)
         total_energy = total_energy / dble(N)
 
     end subroutine calculate_state_variables
