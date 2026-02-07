@@ -8,38 +8,32 @@ module lennard_jones
     contains
     subroutine lj_calculate_forces( I, J )
         implicit none
-        integer, intent(in) :: I, J
-        real(8)             :: RXIJ, RYIJ, RZIJ, FXIJ, FYIJ, FZIJ
-        real(8)             :: rij_sq, sr2_lj, vir
+        integer, intent(in)   :: I, J
+        real(8), dimension(3) :: RIJ, FIJ
+        real(8)               :: rij_sq, sr2_lj, coeff
 
-        RXIJ = RX(I) - RX(J)
-        RYIJ = RY(I) - RY(J)
-        RZIJ = RZ(I) - RZ(J)
+        RIJ(1) = RX(I) - RX(J)
+        RIJ(2) = RY(I) - RY(J)
+        RIJ(3) = RZ(I) - RZ(J)
 
-        if (periodic_set) then
-            RXIJ = RXIJ - ANINT( RXIJ / box_xlen ) * box_xlen
-            RYIJ = RYIJ - ANINT( RYIJ / box_ylen ) * box_ylen
-            RZIJ = RZIJ - ANINT( RZIJ / box_zlen ) * box_zlen
+        if (is_periodic) then
+            RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
         endif
 
-        rij_sq = RXIJ**2 + RYIJ**2 + RZIJ**2
+        rij_sq = SUM( RIJ ** 2.0 )
         sr2_lj = ( sigma ** 2.0 ) / rij_sq
         potential_energy = potential_energy + 4.0 * epsilon * ( sr2_lj**6 - sr2_lj**3 )
 
-        vir = 24.0 * epsilon * (2.0 * sr2_lj**6 - sr2_lj**3)
-        FXIJ = vir * RXIJ / rij_sq
-        FYIJ = vir * RYIJ / rij_sq
-        FZIJ = vir * RZIJ / rij_sq
+        coeff = 24.0 * epsilon * (2.0 * sr2_lj**6 - sr2_lj**3)
+        FIJ = coeff * RIJ / rij_sq
 
-        virial = virial + vir
+        FX(I) = FX(I) + FIJ(1)
+        FY(I) = FY(I) + FIJ(2)
+        FZ(I) = FZ(I) + FIJ(3)
 
-        FX(I) = FX(I) + FXIJ
-        FY(I) = FY(I) + FYIJ
-        FZ(I) = FZ(I) + FZIJ
-
-        FX(J) = FX(J) - FXIJ
-        FY(J) = FY(J) - FYIJ
-        FZ(J) = FZ(J) - FZIJ
+        FX(J) = FX(J) - FIJ(1)
+        FY(J) = FY(J) - FIJ(2)
+        FZ(J) = FZ(J) - FIJ(3)
 
     end subroutine lj_calculate_forces
 
@@ -55,39 +49,33 @@ module lennard_jones12
     contains
     subroutine lj12_calculate_forces( I, J )
         implicit none
-        integer, intent(in) :: I, J
-        real(8) :: RXIJ, RYIJ, RZIJ, FXIJ, FYIJ, FZIJ
-        real(8) :: rij_sq, sr2_lj, vir
+        integer, intent(in)   :: I, J
+        real(8), dimension(3) :: RIJ, FIJ 
+        real(8)               :: rij_sq, sr2_lj, coeff
 
-        RXIJ = RX(I) - RX(J)
-        RYIJ = RY(I) - RY(J)
-        RZIJ = RZ(I) - RZ(J)
+        RIJ(1) = RX(I) - RX(J)
+        RIJ(2) = RY(I) - RY(J)
+        RIJ(3) = RZ(I) - RZ(J)
 
-        if (periodic_set) then
-            RXIJ = RXIJ - ANINT( RXIJ / box_xlen ) * box_xlen
-            RYIJ = RYIJ - ANINT( RYIJ / box_ylen ) * box_ylen
-            RZIJ = RZIJ - ANINT( RZIJ / box_zlen ) * box_zlen
+        if (is_periodic) then
+            RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
         endif
 
-        rij_sq = RXIJ ** 2 + RYIJ ** 2 + RZIJ ** 2
+        rij_sq = SUM( RIJ ** 2.0 )
         sr2_lj = ( sigma ** 2.0 ) / rij_sq
 
         potential_energy = potential_energy + epsilon * ( sr2_lj**6.0 - 2.0*sr2_lj**3.0 )
-        vir = 12.0 * epsilon * (sr2_lj**6 - sr2_lj**3)
+        coeff = 12.0 * epsilon * (sr2_lj**6 - sr2_lj**3)
 
-        FXIJ = vir * RXIJ / rij_sq
-        FYIJ = vir * RYIJ / rij_sq
-        FZIJ = vir * RZIJ / rij_sq
+        FIJ = coeff * RIJ / rij_sq
 
-        virial = virial + vir
+        FX(I) = FX(I) + FIJ(1)
+        FY(I) = FY(I) + FIJ(2)
+        FZ(I) = FZ(I) + FIJ(3)
 
-        FX(I) = FX(I) + FXIJ
-        FY(I) = FY(I) + FYIJ
-        FZ(I) = FZ(I) + FZIJ
-
-        FX(J) = FX(J) - FXIJ
-        FY(J) = FY(J) - FYIJ
-        FZ(J) = FZ(J) - FZIJ
+        FX(J) = FX(J) - FIJ(1)
+        FY(J) = FY(J) - FIJ(2)
+        FZ(J) = FZ(J) - FIJ(3)
 
     end subroutine lj12_calculate_forces
 
@@ -102,39 +90,32 @@ module morse
     contains
     subroutine morse_calculate_forces( I, J )
         implicit none
-        integer, intent(in) :: I, J
-        real(8) :: RXIJ, RYIJ, RZIJ, FXIJ, FYIJ, FZIJ
-        real(8) :: rij, exp_term, vir
+        integer, intent(in)   :: I, J
+        real(8), dimension(3) :: RIJ, FIJ
+        real(8)               :: rij_mag, exp_term, coeff
 
-        RXIJ = RX(I) - RX(J)
-        RYIJ = RY(I) - RY(J)
-        RZIJ = RZ(I) - RZ(J)
+        RIJ(1) = RX(I) - RX(J)
+        RIJ(2) = RY(I) - RY(J)
+        RIJ(3) = RZ(I) - RZ(J)
 
-        if (periodic_set) then
-            RXIJ = RXIJ - ANINT( RXIJ / box_xlen ) * box_xlen
-            RYIJ = RYIJ - ANINT( RYIJ / box_ylen ) * box_ylen
-            RZIJ = RZIJ - ANINT( RZIJ / box_zlen ) * box_zlen
+        if (is_periodic) then
+            RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
         endif
 
-        rij = SQRT( RXIJ**2 + RYIJ**2 + RZIJ**2 )
-        exp_term = EXP( -alpha * ( rij - r0 ) )
+        rij_mag = SQRT( SUM( RIJ ** 2.0 ) )
+        exp_term = EXP( -alpha * ( rij_mag - r0 ) )
 
         potential_energy = potential_energy + DE * ( (1.0 - exp_term)**2 - 1.0 )
-        vir = -2.0 * alpha * DE * (1.0 - exp_term) * exp_term / rij
+        coeff = -2.0 * alpha * DE * (1.0 - exp_term) * exp_term / rij_mag
+        FIJ = coeff * RIJ
 
-        FXIJ = vir * RXIJ
-        FYIJ = vir * RYIJ
-        FZIJ = vir * RZIJ
+        FX(I) = FX(I) + FIJ(1)
+        FY(I) = FY(I) + FIJ(2)
+        FZ(I) = FZ(I) + FIJ(3)
 
-        virial = virial + vir * rij
-
-        FX(I) = FX(I) + FXIJ
-        FY(I) = FY(I) + FYIJ
-        FZ(I) = FZ(I) + FZIJ
-
-        FX(J) = FX(J) - FXIJ
-        FY(J) = FY(J) - FYIJ
-        FZ(J) = FZ(J) - FZIJ
+        FX(J) = FX(J) - FIJ(1)
+        FY(J) = FY(J) - FIJ(2)
+        FZ(J) = FZ(J) - FIJ(3)
 
     end subroutine morse_calculate_forces
 
@@ -213,7 +194,7 @@ module gay_berne
         RIJ(2) = RY(I) - RY(J)
         RIJ(3) = RZ(I) - RZ(J)
 
-        if (periodic_set) then
+        if (is_periodic) then
             RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
         endif
 
@@ -256,7 +237,6 @@ module gay_berne
         TJ  = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * dR_du2))
 
         potential_energy = potential_energy + pot
-        virial = virial + dot( FIJ, RIJ )
         TORQ1 = cross( U1, TI )
         TORQ2 = cross( U2, TJ )
 
@@ -476,7 +456,7 @@ module ecp
         RIJ(2) = RY(I) - RY(J)
         RIJ(3) = RZ(I) - RZ(J)
 
-        if (periodic_set) then
+        if (is_periodic) then
             RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
         endif
 
@@ -587,7 +567,6 @@ module ecp
         TORQ2 = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_du2))
         
         potential_energy = potential_energy + pot
-        virial = virial + dot( FIJ, RIJ )
         
         FX(I) = FX(I) + FIJ(1)
         FY(I) = FY(I) + FIJ(2)
@@ -607,3 +586,349 @@ module ecp
         
     end subroutine ecp_calculate_forces
 end module ecp
+
+module bonded_interactions
+    use system
+    implicit none
+
+    contains
+    subroutine bend_calculate_forces( I, J, K, coeff )
+        implicit none
+        integer, intent(in) :: I, J, K
+        real(8), intent(in) :: coeff
+        real(8) :: VI(3), VJ(3), FI(3), FJ(3), FK(3)
+        real(8) :: CC11, CC12, CC22
+        real(8) :: prefac, fac, fac1, fac2, pot
+
+        VI(1) = RX(J) - RX(I)
+        VI(2) = RY(J) - RY(I)
+        VI(3) = RZ(J) - RZ(I)
+
+        VJ(1) = RX(K) - RX(J)
+        VJ(2) = RY(K) - RY(J)
+        VJ(3) = RZ(K) - RZ(J)
+
+        if (is_periodic) then
+            VI = VI - ANINT( VI / box_length ) * box_length
+            VJ = VJ - ANINT( VJ / box_length ) * box_length
+        endif
+
+        CC11 = dot( VI, VI )
+        CC12 = dot( VI, VJ )
+        CC22 = dot( VJ, VJ )
+
+        prefac = 1.0 / SQRT( CC11 * CC22 )
+        fac    = CC12
+        fac1   = fac / CC22
+        fac2   = fac / CC11
+
+        pot = -coeff * prefac * fac
+
+        FK = -coeff * prefac * ( fac1 * VJ - VI )
+        FJ =  coeff * prefac * ( fac1 * VJ - fac2 * VI + VJ - VI )
+        FI =  coeff * prefac * ( fac2 * VI - VJ )
+
+        potential_energy = potential_energy + pot
+
+        FX(I) = FX(I) + FI(1)
+        FY(I) = FY(I) + FI(2)
+        FZ(I) = FZ(I) + FI(3)
+
+        FX(J) = FX(J) + FJ(1)
+        FY(J) = FY(J) + FJ(2)
+        FZ(J) = FZ(J) + FJ(3)
+
+        FX(K) = FX(K) + FK(1)
+        FY(K) = FY(K) + FK(2)
+        FZ(K) = FZ(K) + FK(3)
+        
+    end subroutine bend_calculate_forces
+
+    subroutine dih_calculate_forces( I, J, K, L, coeff )
+        implicit none
+        integer, intent(in) :: I, J, K, L
+        real(8), intent(in) :: coeff
+        real(8) :: VI(3), VJ(3), VK(3), FI(3), FJ(3), FK(3), FL(3)
+        real(8) :: CC11, CC12, CC13, CC22, CC23, CC33
+        real(8) :: DD11, DD12, DD13, DD22, DD23, DD33
+        real(8) :: prefac, fac, fac1, fac2, fac3
+        real(8) :: pot
+
+        VI(1) = RX(J) - RX(I)
+        VI(2) = RY(J) - RY(I)
+        VI(3) = RZ(J) - RZ(I)
+
+        VJ(1) = RX(K) - RX(J)
+        VJ(2) = RY(K) - RY(J)
+        VJ(3) = RZ(K) - RZ(J)
+
+        VK(1) = RX(L) - RX(K)
+        VK(2) = RY(L) - RY(K)
+        VK(3) = RZ(L) - RZ(K)
+
+        if (is_periodic) then
+            VI = VI - ANINT( VI / box_length ) * box_length
+            VJ = VJ - ANINT( VJ / box_length ) * box_length
+            VK = VK - ANINT( VK / box_length ) * box_length
+        endif
+
+        CC11 = dot( VI, VI )
+        CC12 = dot( VI, VJ )
+        CC13 = dot( VI, VK )
+        CC22 = dot( VJ, VJ )
+        CC23 = dot( VJ, VK )
+        CC33 = dot( VK, VK )
+
+        DD11 = CC11 * CC11 - CC11 ** 2.0
+        DD12 = CC11 * CC22 - CC12 ** 2.0
+        DD13 = CC11 * CC33 - CC13 ** 2.0
+        DD22 = CC22 * CC22 - CC22 ** 2.0
+        DD23 = CC22 * CC33 - CC23 ** 2.0
+        DD33 = CC33 * CC33 - CC33 ** 2.0
+
+        prefac = 1.0 / SQRT( DD23 * DD12 )
+        fac = CC23 * CC12 - CC13 * CC22
+        fac1 = fac / DD23
+        fac2 = fac / DD12
+
+        pot = coeff * prefac * fac
+
+        FL = -coeff * prefac * ( CC12 * VJ - CC22 * VI - fac1 * ( CC22 * VK- CC23 * VJ ) )
+
+        FK = -coeff * prefac * ( CC12 * VK - CC12 * VJ + CC23 * VI + CC22 * VI - 2.0 * CC13 * VJ &
+                    - fac2  * ( CC11 * VJ - CC12 * VI ) - fac1 * ( CC33 * VJ - CC22 * VK - CC23 * VK + CC23 * VJ ) )
+
+        FJ = -coeff * prefac * ( -CC12 * VK + CC23 * VJ - CC23 * VI - CC22 * VK + 2.0 * CC13 * VJ &
+                    - fac2  * (  CC22 * VI - CC11 * VJ - CC12 * VJ + CC12 * VI ) - fac1 * ( -CC33 * VJ + CC23 * VK ) )
+
+        FI = -coeff * prefac * ( -CC23 * VJ + CC22 * VK - fac2 * ( -CC22 * VI + CC12 * VJ ) )
+
+        potential_energy = potential_energy + pot
+
+        FX(I) = FX(I) + FI(1)
+        FY(I) = FY(I) + FI(2)
+        FZ(I) = FZ(I) + FI(3)
+
+        FX(J) = FX(J) + FJ(1)
+        FY(J) = FY(J) + FJ(2)
+        FZ(J) = FZ(J) + FJ(3)    
+
+        FX(K) = FX(K) + FK(1)
+        FY(K) = FY(K) + FK(2)
+        FZ(K) = FZ(K) + FK(3)
+
+        FX(L) = FX(L) + FL(1)
+        FY(L) = FY(L) + FL(2)
+        FZ(L) = FZ(L) + FL(3)
+
+    end subroutine dih_calculate_forces
+
+    subroutine angle_bend_calculate_forces( I, J, K, coeff, ang )
+        implicit none
+        integer, intent(in) :: I, J, K
+        real(8), intent(in) :: coeff, ang
+        real(8) :: VI(3), VJ(3), FI(3), FJ(3), FK(3)
+        real(8) :: CC11, CC12, CC22
+        real(8) :: prefac, fac, fac1, fac2, pot
+
+        VI(1) = RX(J) - RX(I)
+        VI(2) = RY(J) - RY(I)
+        VI(3) = RZ(J) - RZ(I)
+
+        VJ(1) = RX(K) - RX(J)
+        VJ(2) = RY(K) - RY(J)
+        VJ(3) = RZ(K) - RZ(J)
+
+        CC11 = dot( VI, VI )
+        CC12 = dot( VI, VJ )
+        CC22 = dot( VJ, VJ )
+
+        prefac = 1.0 / SQRT( CC11 * CC22 )
+        fac    = CC12
+        fac1   = fac / CC22
+        fac2   = fac / CC11
+
+        pot = -coeff * prefac * fac
+
+        FK = -coeff * prefac * ( fac1 * VJ - VI )
+        FJ =  coeff * prefac * ( fac1 * VJ - fac2 * VI + VJ - VI )
+        FI =  coeff * prefac * ( fac2 * VI - VJ )
+
+        potential_energy = potential_energy + pot
+
+        FX(I) = FX(I) + FI(1)
+        FY(I) = FY(I) + FI(2)
+        FZ(I) = FZ(I) + FI(3)
+
+        FX(J) = FX(J) + FJ(1)
+        FY(J) = FY(J) + FJ(2)
+        FZ(J) = FZ(J) + FJ(3)
+
+        FX(K) = FX(K) + FK(1)
+        FY(K) = FY(K) + FK(2)
+        FZ(K) = FZ(K) + FK(3)
+        
+    end subroutine angle_bend_calculate_forces
+
+end module bonded_interactions
+
+module constraints
+    use system
+    implicit none
+
+    contains
+    subroutine apply_constraints_a( DT )
+        implicit none
+        real(8), intent(in) :: DT
+        real(8) :: RIJ(3), RIJ_old(3), DR(3)   
+        real(8) :: L_ij, chi, vdot, r_tol, len
+        integer :: I, J, IX, rattle, max_rattle = 100
+        logical :: moved(N)
+
+        L_ij = 0.0; rattle = 0; 
+        r_tol = 1.0e-5; max_rattle = 100
+        moved = .TRUE.
+
+        do while (any(moved) .and. rattle < max_rattle)
+
+            do IX = 1, NC
+                I   = BBI(IX)
+                J   = BBJ(IX)
+                len = BB_len(IX)
+                
+                if ( moved(I) .or. moved(J) ) then
+
+                    RIJ(1) = RX(I) - RX(J)
+                    RIJ(2) = RY(I) - RY(J)
+                    RIJ(3) = RZ(I) - RZ(J)
+
+                    if (is_periodic) then
+                        RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
+                    endif
+
+                    chi = len ** 2 - SUM( RIJ ** 2)
+
+                    if (abs(chi) > 2 * r_tol * len**2.0) then 
+
+                        RIJ_old(1) = RX_old(I) - RX_old(J)
+                        RIJ_old(2) = RY_old(I) - RY_old(J)
+                        RIJ_old(3) = RZ_old(I) - RZ_old(J)
+
+                        if (is_periodic) then
+                            RIJ_old = RIJ_old - ANINT( RIJ_old / box_length ) * box_length
+                        endif
+
+                        vdot = dot( RIJ, RIJ_old )
+
+                        ! write(*, *) chi, vdot, len, sum(RIJ**2), sum(RIJ_old**2)
+
+                        if (vdot < r_tol * len ** 2.0) then
+                            stop "Constraint failure. SB position multipliers exploded !!"
+                        endif
+
+                        L_ij = chi / ( 4.0 * vdot )
+                        DR = L_ij * rij_old
+
+                        RX(I) = RX(I) + DR(1)
+                        RY(I) = RY(I) + DR(2)
+                        RZ(I) = RZ(I) + DR(3)
+
+                        RX(J) = RX(J) - DR(1)
+                        RY(J) = RY(J) - DR(2)
+                        RZ(J) = RZ(J) - DR(3)
+
+                        VX(I) = VX(I) + DR(1) / DT
+                        VY(I) = VY(I) + DR(2) / DT
+                        VZ(I) = VZ(I) + DR(3) / DT
+
+                        VX(J) = VX(J) - DR(1) / DT
+                        VY(J) = VY(J) - DR(2) / DT
+                        VZ(J) = VZ(J) - DR(3) / DT
+
+                        moved(i) = .TRUE.
+                        moved(j) = .TRUE.
+                    else
+                        moved(i) = .FALSE.
+                        moved(j) = .FALSE.
+                    endif
+
+                endif
+
+            enddo
+
+            rattle = rattle + 1
+
+        enddo
+
+    end subroutine apply_constraints_a
+
+    subroutine apply_constraints_b( DT )
+        implicit none
+        real(8), intent(in) :: DT
+        real(8) :: RIJ(3), VIJ(3), DV(3)   
+        real(8) :: L_ij, chi, vdot, r_tol, len
+        integer :: I, J, IX, rattle, max_rattle = 100
+        logical :: moved(N)
+
+        L_ij = 0.0; rattle = 0; 
+        r_tol = 1.0e-5; max_rattle = 100
+        moved = .TRUE.
+
+        do while (any(moved) .and. rattle < max_rattle)
+
+            do IX = 1, NC
+                I   = BBI(IX)
+                J   = BBJ(IX)
+                len = BB_len(IX)
+
+                if( moved(I) .or. moved(J) ) then
+
+                    RIJ(1) = RX(I) - RX(J)
+                    RIJ(2) = RY(I) - RY(J)
+                    RIJ(3) = RZ(I) - RZ(J)
+
+                    if (is_periodic) then
+                        RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
+                    endif
+
+                    VIJ(1) = VX(I) - VX(J)
+                    VIJ(2) = VY(I) - VY(J)
+                    VIJ(3) = VZ(I) - VZ(J)
+
+                    vdot = dot( RIJ, VIJ )
+                    L_ij = -vdot / ( 2.0 * len**2 )
+                    
+                    if (abs(L_ij) > r_tol) then
+
+                        virial = virial + L_ij * len**2
+                        DV = L_ij * RIJ
+
+                        VX(I) = VX(I) + DV(1)
+                        VY(I) = VY(I) + DV(2)
+                        VZ(I) = VZ(I) + DV(3)
+
+                        VX(J) = VX(J) - DV(1)
+                        VY(J) = VY(J) - DV(2)
+                        VZ(J) = VZ(J) - DV(3)
+
+                        moved(i) = .TRUE.
+                        moved(j) = .TRUE.
+
+                    else
+
+                        moved(i) = .FALSE.
+                        moved(j) = .FALSE.
+
+                    endif
+
+                endif
+                
+            enddo
+
+            rattle = rattle + 1
+
+        enddo
+
+    end subroutine apply_constraints_b
+    
+end module constraints

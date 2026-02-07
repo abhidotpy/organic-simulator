@@ -22,7 +22,7 @@ module state_data_reporter
         integer, intent(in) :: unit, step
 
         write(unit, "(I5, 100F20.10)") &
-        step, potential_energy, kinetic_energy, total_energy, temperature, pressure, density, rkinetic_energy
+        step, potential_energy, kinetic_energy, total_energy, temperature, pressure, density
     
     end subroutine report_state_data
 
@@ -63,9 +63,9 @@ module trajectory_reporter
         write(unit, '(A)') "ITEM: NUMBER OF ATOMS"
         write(unit, *) n
         write(unit, "(A)") "ITEM: BOX BOUNDS pp pp pp"
-        write(unit, "(1x, 2f20.10)") -box_length / 2.0, box_length / 2.0
-        write(unit, "(1x, 2f20.10)") -box_length / 2.0, box_length / 2.0
-        write(unit, "(1x, 2f20.10)") -box_length / 2.0, box_length / 2.0
+        write(unit, "(1x, 2f20.10)") -box_length(1) / 2.0, box_length(1) / 2.0
+        write(unit, "(1x, 2f20.10)") -box_length(2) / 2.0, box_length(2) / 2.0
+        write(unit, "(1x, 2f20.10)") -box_length(3) / 2.0, box_length(3) / 2.0
         write(unit, "(A)") "ITEM: ATOMS id shapex shapey shapez x y z vx vy vz fx fy fz quatw quati quatj quatk"
 
         do I = 1, N
