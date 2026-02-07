@@ -21,9 +21,8 @@ module state_data_reporter
         implicit none
         integer, intent(in) :: unit, step
 
-        write(unit, "(I5, 6(F20.10))") &
-        step, potential_energy / dble(N), kinetic_energy / dble(N), &
-        (potential_energy + kinetic_energy) / dble(N), temperature, pressure, density
+        write(unit, "(I5, 100F20.10)") &
+        step, potential_energy, kinetic_energy, total_energy, temperature, pressure, density, rkinetic_energy
     
     end subroutine report_state_data
 
@@ -67,10 +66,11 @@ module trajectory_reporter
         write(unit, "(1x, 2f20.10)") -box_length / 2.0, box_length / 2.0
         write(unit, "(1x, 2f20.10)") -box_length / 2.0, box_length / 2.0
         write(unit, "(1x, 2f20.10)") -box_length / 2.0, box_length / 2.0
-        write(unit, "(A)") "ITEM: ATOMS id radius x y z vx vy vz fx fy fz"
+        write(unit, "(A)") "ITEM: ATOMS id shapex shapey shapez x y z vx vy vz fx fy fz quatw quati quatj quatk"
 
         do I = 1, N
-            write(unit, "(1x, i5, 50f20.10)") I, 0.5, RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I), FX(I), FY(I), FZ(I)
+            write(unit, "(1x, i5, 50f20.10)") I, rad, RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I), FX(I), FY(I), FZ(I), &
+            QW(I), QX(I), QY(I), QZ(I)
         enddo
 
     end subroutine report_trajectory
@@ -108,7 +108,7 @@ module config_reporter
         integer :: I
 
         do I = 1, N
-            write(unit, "(1x, 50f20.10)") RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I)
+            write(unit, "(1x, 50f20.10)") RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I), LX(I), LY(I), LZ(I), QW(I), QX(I), QY(I), QZ(I)
         enddo
 
     end subroutine report_confwriter
