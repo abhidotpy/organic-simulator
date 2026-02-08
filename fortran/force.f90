@@ -6,11 +6,14 @@ module lennard_jones
     real(8) :: sigma = 1.0
 
     contains
-    subroutine lj_calculate_forces( I, J )
+    subroutine lj_calculate_forces( I, J, cutoff, eng )
         implicit none
-        integer, intent(in)   :: I, J
-        real(8), dimension(3) :: RIJ, FIJ
-        real(8)               :: rij_sq, sr2_lj, coeff
+        integer, intent(in)           :: I, J
+        real(8), optional, intent(in) :: eng
+        real(8), intent(in)           :: cutoff
+        real(8), dimension(3)         :: RIJ, FIJ
+        real(8)                       :: rij_sq, rcut_sq, sr2_lj, coeff
+        real(8)                       :: pot, pot_cut, sr2_cut
 
         RIJ(1) = RX(I) - RX(J)
         RIJ(2) = RY(I) - RY(J)
@@ -20,20 +23,35 @@ module lennard_jones
             RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
         endif
 
+        if (present(eng)) then
+            epsilon = eng
+        else
+            epsilon = 1.0
+        endif
+
         rij_sq = SUM( RIJ ** 2.0 )
-        sr2_lj = ( sigma ** 2.0 ) / rij_sq
-        potential_energy = potential_energy + 4.0 * epsilon * ( sr2_lj**6 - sr2_lj**3 )
+        rcut_sq = cutoff ** 2.0
 
-        coeff = 24.0 * epsilon * (2.0 * sr2_lj**6 - sr2_lj**3)
-        FIJ = coeff * RIJ / rij_sq
+        if (rij_sq < rcut_sq) then
+            sigma = ( exc_rad(I) + exc_rad(J) ) / 2.0
+            sr2_lj = ( sigma ** 2.0 ) / rij_sq
+            sr2_cut = ( sigma ** 2.0 ) / rcut_sq
 
-        FX(I) = FX(I) + FIJ(1)
-        FY(I) = FY(I) + FIJ(2)
-        FZ(I) = FZ(I) + FIJ(3)
+            pot = 4.0 * epsilon * ( sr2_lj**6 - sr2_lj**3 )
+            pot_cut = 4.0 * epsilon * ( sr2_cut**6 - sr2_cut**3 )
+            coeff = 24.0 * epsilon * (2.0 * sr2_lj**6 - sr2_lj**3)
 
-        FX(J) = FX(J) - FIJ(1)
-        FY(J) = FY(J) - FIJ(2)
-        FZ(J) = FZ(J) - FIJ(3)
+            potential_energy = potential_energy + pot - pot_cut
+            FIJ = coeff * RIJ / rij_sq
+
+            FX(I) = FX(I) + FIJ(1)
+            FY(I) = FY(I) + FIJ(2)
+            FZ(I) = FZ(I) + FIJ(3)
+
+            FX(J) = FX(J) - FIJ(1)
+            FY(J) = FY(J) - FIJ(2)
+            FZ(J) = FZ(J) - FIJ(3)
+        endif
 
     end subroutine lj_calculate_forces
 
@@ -47,11 +65,15 @@ module lennard_jones12
     real(8) :: sigma = 1.0
 
     contains
-    subroutine lj12_calculate_forces( I, J )
+    subroutine lj12_calculate_forces( I, J, cutoff, eng )
         implicit none
-        integer, intent(in)   :: I, J
-        real(8), dimension(3) :: RIJ, FIJ 
-        real(8)               :: rij_sq, sr2_lj, coeff
+        integer, intent(in)           :: I, J
+        real(8), optional, intent(in) :: eng 
+        real(8), intent(in)           :: cutoff
+        real(8), dimension(3)         :: RIJ, FIJ
+        real(8)                       :: rij_sq, rcut_sq, sr2_lj, coeff
+        real(8)                       :: pot, pot_cut, sr2_cut
+
 
         RIJ(1) = RX(I) - RX(J)
         RIJ(2) = RY(I) - RY(J)
@@ -61,21 +83,35 @@ module lennard_jones12
             RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
         endif
 
+        if (present(eng)) then
+            epsilon = eng
+        else
+            epsilon = 1.0
+        endif
+
         rij_sq = SUM( RIJ ** 2.0 )
-        sr2_lj = ( sigma ** 2.0 ) / rij_sq
+        rcut_sq = cutoff ** 2.0
 
-        potential_energy = potential_energy + epsilon * ( sr2_lj**6.0 - 2.0*sr2_lj**3.0 )
-        coeff = 12.0 * epsilon * (sr2_lj**6 - sr2_lj**3)
+        if (rij_sq < rcut_sq) then
+            sigma = ( exc_rad(I) + exc_rad(J) ) / 2.0
+            sr2_lj = ( sigma ** 2.0 ) / rij_sq
+            sr2_cut = ( sigma ** 2.0 ) / rcut_sq
 
-        FIJ = coeff * RIJ / rij_sq
+            pot = epsilon * ( sr2_lj**6.0 - 2.0*sr2_lj**3.0 )
+            pot_cut = epsilon * ( sr2_cut**6.0 - 2.0*sr2_cut**3.0 )
+            coeff = 12.0 * epsilon * (sr2_lj**6 - sr2_lj**3)
 
-        FX(I) = FX(I) + FIJ(1)
-        FY(I) = FY(I) + FIJ(2)
-        FZ(I) = FZ(I) + FIJ(3)
+            potential_energy = potential_energy + pot - pot_cut
+            FIJ = coeff * RIJ / rij_sq
 
-        FX(J) = FX(J) - FIJ(1)
-        FY(J) = FY(J) - FIJ(2)
-        FZ(J) = FZ(J) - FIJ(3)
+            FX(I) = FX(I) + FIJ(1)
+            FY(I) = FY(I) + FIJ(2)
+            FZ(I) = FZ(I) + FIJ(3)
+
+            FX(J) = FX(J) - FIJ(1)
+            FY(J) = FY(J) - FIJ(2)
+            FZ(J) = FZ(J) - FIJ(3)
+        endif
 
     end subroutine lj12_calculate_forces
 
@@ -85,14 +121,14 @@ module morse
     use system
     implicit none
 
-    real(8) :: DE, alpha, r0, rp
-
     contains
-    subroutine morse_calculate_forces( I, J )
+    subroutine morse_calculate_forces( I, J, dissoc, width, rmin, cutoff )
         implicit none
         integer, intent(in)   :: I, J
         real(8), dimension(3) :: RIJ, FIJ
-        real(8)               :: rij_mag, exp_term, coeff
+        real(8), intent(in)   :: dissoc, width, rmin, cutoff
+        real(8)               :: rij_mag, exp_term
+        real(8)               :: exp_cut, pot, pot_cut
 
         RIJ(1) = RX(I) - RX(J)
         RIJ(2) = RY(I) - RY(J)
@@ -102,20 +138,26 @@ module morse
             RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
         endif
 
-        rij_mag = SQRT( SUM( RIJ ** 2.0 ) )
-        exp_term = EXP( -alpha * ( rij_mag - r0 ) )
+        rij_mag = SQRT( SUM( RIJ**2.0 ) )
 
-        potential_energy = potential_energy + DE * ( (1.0 - exp_term)**2 - 1.0 )
-        coeff = -2.0 * alpha * DE * (1.0 - exp_term) * exp_term / rij_mag
-        FIJ = coeff * RIJ
+        if (rij_mag < cutoff) then
+            exp_term = EXP( -width * ( rij_mag - rmin ) )
+            exp_cut  = EXP( -width * ( cutoff - rmin ) )
 
-        FX(I) = FX(I) + FIJ(1)
-        FY(I) = FY(I) + FIJ(2)
-        FZ(I) = FZ(I) + FIJ(3)
+            pot = dissoc * ( (1.0 - exp_term)**2.0 - 1.0 )
+            pot_cut = dissoc * ( (1.0 - exp_cut)**2.0 - 1.0 )
 
-        FX(J) = FX(J) - FIJ(1)
-        FY(J) = FY(J) - FIJ(2)
-        FZ(J) = FZ(J) - FIJ(3)
+            potential_energy = potential_energy + pot - pot_cut
+            FIJ = -2.0 * width * dissoc * (1.0 - exp_term) * exp_term * RIJ / rij_mag
+
+            FX(I) = FX(I) + FIJ(1)
+            FY(I) = FY(I) + FIJ(2)
+            FZ(I) = FZ(I) + FIJ(3)
+
+            FX(J) = FX(J) - FIJ(1)
+            FY(J) = FY(J) - FIJ(2)
+            FZ(J) = FZ(J) - FIJ(3)
+        endif
 
     end subroutine morse_calculate_forces
 
@@ -125,7 +167,8 @@ module gay_berne
     use system
     implicit none
     
-    real(8), dimension(3), public :: U1, U2, RIJ, FIJ, TI, TJ, TORQ1, TORQ2
+    real(8), dimension(3), public :: U1, U2, RIJ
+    real(8), dimension(3), public :: FIJ, TI, TJ, TORQ1, TORQ2
     public :: gb_calculate_forces
     
     private
@@ -212,29 +255,29 @@ module gay_berne
         ru1 = dot( RIJ, U1 )
         ru2 = dot( RIJ, U2 )
         uu  = dot( U1, U2 )
-        chi = ( rad(3) ** 2 - rad(1) ** 2 ) / ( rad(3) ** 2 + rad(1) ** 2 )
-        xhi = ( erad(1) ** (1.0/meu) - erad(3) ** (1.0/meu) ) / ( erad(1) ** (1.0/meu) + erad(3) ** (1.0/meu) )
+        chi = ( shape_z(I) ** 2 - shape_x(I) ** 2 ) / ( shape_z(I) ** 2 + shape_x(I) ** 2 )
+        xhi = ( eshape_x(I) ** (1.0/meu) - eshape_z(I) ** (1.0/meu) ) / ( eshape_x(I) ** (1.0/meu) + eshape_z(I) ** (1.0/meu) )
 
         eps1 = ( 1 - ( chi * uu ) ** 2) ** (-1.0 / 2.0)
         eps2 = g_func( xhi )
-        sigma = rad(1) * g_func( chi ) ** (-1.0 / 2.0)
+        sigma = shape_x(I) * g_func( chi ) ** (-1.0 / 2.0)
         sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
 
-        dR_dr   = (1.0 / sigma_0) * (( RIJ / rij_mag ) + 0.5 * rad(1) * dG_dr( chi ) * g_func( chi ) ** (-3.0 / 2.0))
+        dR_dr   = (1.0 / sigma_0) * (( RIJ / rij_mag ) + 0.5 * shape_x(I) * dG_dr( chi ) * g_func( chi ) ** (-3.0 / 2.0))
         de2_dr  = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_dr( xhi )
 
         de1_du1 = (eps2 ** meu) * neu * eps1 ** (neu + 2) * (chi ** 2 * uu * U2)
         de2_du1 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * dG_du1( xhi )
-        dR_du1  = (12.0 * sr**7 - 12.0 * sr**13) * 0.5 * (rad(1) / sigma_0) * dG_du1( chi ) * g_func( chi ) ** (-3.0 / 2.0)
+        dR_du1  = (6.0 * sr**7 - 12.0 * sr**13) * 0.5 * (shape_x(I) / sigma_0) * dG_du1( chi ) * g_func( chi ) ** (-3.0 / 2.0)
 
         de1_du2 = (eps2 ** meu) * neu * eps1 ** (neu + 2) * (chi ** 2 * uu * U1)
         de2_du2 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * dG_du2( xhi )
-        dR_du2  = (12.0 * sr**7 - 12.0 * sr**13) * 0.5 * (rad(1) / sigma_0) * dG_du2( chi ) * g_func( chi ) ** (-3.0 / 2.0)
+        dR_du2  = (6.0 * sr**7 - 12.0 * sr**13) * 0.5 * (shape_x(I) / sigma_0) * dG_du2( chi ) * g_func( chi ) ** (-3.0 / 2.0)
     
-        pot = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - 2.0 * sr ** 6.0)
-        FIJ = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_dr  + de2_dr * (sr**12 - 2.0*sr**6))
-        TI  = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * dR_du1))
-        TJ  = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * dR_du2))
+        pot = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - sr ** 6.0)
+        FIJ = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (6.0 * sr**7 - 12.0 * sr**13) * dR_dr  + de2_dr * (sr ** 12.0 - sr ** 6.0))
+        TI  = (-1.0) * ((sr ** 12.0 - sr ** 6.0) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * dR_du1))
+        TJ  = (-1.0) * ((sr ** 12.0 - sr ** 6.0) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * dR_du2))
 
         potential_energy = potential_energy + pot
         TORQ1 = cross( U1, TI )
@@ -264,7 +307,7 @@ module ecp
     use system
     implicit none
 
-    real(8), dimension(3, 3) :: U1, U2, S1_sq, S2_sq, E1, E2, EM
+    real(8), dimension(3, 3) :: U1, U2, S1, S2, E1, E2, EM
     real(8), dimension(3, 3) :: AE, BE, GE, AR, BR, GR, MM1, MM2
     real(8), dimension(3) :: KE, KR
     real(8) :: lambda_E, lambda_R
@@ -448,7 +491,7 @@ module ecp
         integer, intent(in)     :: I, J
         real(8), dimension(3)   :: dR_dr, de2_dr, dR_du1, dR_du2
         real(8), dimension(3)   :: de1_du1, de2_du1, de1_du2, de2_du2
-        real(8)                 :: e0, sigma_t1, sigma_t2, sigma_t
+        real(8)                 :: e10, e20, sigma_t1, sigma_t2, sigma_t
         real(8)                 :: pot, vir
         integer                 :: IX
         
@@ -484,32 +527,33 @@ module ecp
         U2(3, 2) = 2.0 * ( QY(J) * QZ(J) - QW(J) * QX(J) )
         U2(3, 3) = QW(J)**2 - QX(J)**2 - QY(J)**2 + QZ(J)**2
 
-        e0 = maxval( erad )
-        E1 = 0.0_8; E2 = 0.0_8; S1_sq = 0.0_8; S2_sq = 0.0_8
+        e10 = max( eshape_x(I), eshape_y(I), eshape_z(I) )
+        e20 = max( eshape_x(J), eshape_y(J), eshape_z(J) )
+        E1 = 0.0_8; E2 = 0.0_8; S1 = 0.0_8; S2 = 0.0_8
 
-        E1(1, 1) = ( (e0 / erad(1)) ** (1/meu) ) / 4.0
-        E1(2, 2) = ( (e0 / erad(2)) ** (1/meu) ) / 4.0
-        E1(3, 3) = ( (e0 / erad(3)) ** (1/meu) ) / 4.0
+        E1(1, 1) = ( (e10 / eshape_x(I)) ** (1/meu) ) / 4.0
+        E1(2, 2) = ( (e10 / eshape_y(I)) ** (1/meu) ) / 4.0
+        E1(3, 3) = ( (e10 / eshape_z(I)) ** (1/meu) ) / 4.0
 
-        E2(1, 1) = ( (e0 / erad(1)) ** (1/meu) ) / 4.0
-        E2(2, 2) = ( (e0 / erad(2)) ** (1/meu) ) / 4.0
-        E2(3, 3) = ( (e0 / erad(3)) ** (1/meu) ) / 4.0
+        E2(1, 1) = ( (e20 / eshape_x(J)) ** (1/meu) ) / 4.0
+        E2(2, 2) = ( (e20 / eshape_y(J)) ** (1/meu) ) / 4.0
+        E2(3, 3) = ( (e20 / eshape_z(J)) ** (1/meu) ) / 4.0
 
-        S1_sq(1, 1) = ( (rad(1) / 2.0) ** 2.0 )
-        S1_sq(2, 2) = ( (rad(2) / 2.0) ** 2.0 )
-        S1_sq(3, 3) = ( (rad(3) / 2.0) ** 2.0 )
+        S1(1, 1) = ( shape_x(I) / 2.0 )
+        S1(2, 2) = ( shape_y(I) / 2.0 )
+        S1(3, 3) = ( shape_z(I) / 2.0 )
 
-        S2_sq(1, 1) = ( (rad(1) / 2.0) ** 2.0 )
-        S2_sq(2, 2) = ( (rad(2) / 2.0) ** 2.0 )
-        S2_sq(3, 3) = ( (rad(3) / 2.0) ** 2.0 )
+        S2(1, 1) = ( shape_x(J) / 2.0 )
+        S2(2, 2) = ( shape_y(J) / 2.0 )
+        S2(3, 3) = ( shape_z(J) / 2.0 )
 
-        AR = transpose(U1) .x. S1_sq .x. U1
-        BR = transpose(U2) .x. S2_sq .x. U2
+        AR = transpose(U1) .x. ( S1 ** 2.0 ) .x. U1
+        BR = transpose(U2) .x. ( S2 ** 2.0 ) .x. U2
         AE = transpose(U1) .x. E1 .x. U1
         BE = transpose(U2) .x. E2 .x. U2
 
-        sigma_t1 = (rad(1) * rad(2) + rad(3) ** 2) * sqrt(2.0 * rad(1) * rad(2)) / 8.0
-        sigma_t2 = (rad(1) * rad(2) + rad(3) ** 2) * sqrt(2.0 * rad(1) * rad(2)) / 8.0
+        sigma_t1 = (shape_x(I) * shape_y(I) + shape_z(I) ** 2) * sqrt( 2.0 * shape_x(I) * shape_y(I) ) / 8.0
+        sigma_t2 = (shape_x(J) * shape_y(J) + shape_z(J) ** 2) * sqrt( 2.0 * shape_x(J) * shape_y(J) ) / 8.0
         sigma_t = sqrt( sigma_t1 * sigma_t2 )
         
         EM = inverse( AR + BR )
@@ -542,7 +586,7 @@ module ecp
         de2_dr = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dF_dr( lambda_E, KE )
         
         de1_du1 = 0.0;
-        MM1 = transpose(U1) .x. sqrt(S1_sq)
+        MM1 = transpose(U1) .x. S1
         do IX = 1, 3
             de1_du1 = de1_du1 + cross( MM1(:, IX), EM .x. MM1(:, IX) )
         enddo
@@ -552,7 +596,7 @@ module ecp
         dR_du1 =  (0.5 / sigma_0) * (1 - lambda_R) * dF_du( lambda_R, KR, AR ) * phi ** (-3.0 / 2.0)
         
         de1_du2 = 0.0
-        MM2 = transpose(U2) .x. sqrt(S2_sq)
+        MM2 = transpose(U2) .x. S2
         do IX = 1, 3
             de1_du2 = de1_du2 + cross( MM2(:, IX), EM .x. MM2(:, IX) )
         enddo
@@ -561,10 +605,10 @@ module ecp
         de2_du2 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * lambda_E * dF_du( lambda_E, KE, BE )
         dR_du2 =  (0.5 / sigma_0) * lambda_R * dF_du( lambda_R, KR, BR ) * phi ** (-3.0 / 2.0)
         
-        pot   = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - 2.0 * sr ** 6.0)
-        FIJ   = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_dr  + (sr**12 - 2.0*sr**6) * de2_dr)
-        TORQ1 = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_du1))
-        TORQ2 = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_du2))
+        pot   = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - sr ** 6.0)
+        FIJ   = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (6.0 * sr**7 - 12.0 * sr**13) * dR_dr  + de2_dr * (sr ** 12.0 - sr ** 6.0))
+        TORQ1 = (-1.0) * ((sr ** 12.0 - sr ** 6.0) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * (6.0 * sr**7 - 12.0 * sr**13) * dR_du1))
+        TORQ2 = (-1.0) * ((sr ** 12.0 - sr ** 6.0) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * (6.0 * sr**7 - 12.0 * sr**13) * dR_du2))
         
         potential_energy = potential_energy + pot
         

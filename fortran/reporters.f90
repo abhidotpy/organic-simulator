@@ -66,10 +66,10 @@ module trajectory_reporter
         write(unit, "(1x, 2f20.10)") -box_length(1) / 2.0, box_length(1) / 2.0
         write(unit, "(1x, 2f20.10)") -box_length(2) / 2.0, box_length(2) / 2.0
         write(unit, "(1x, 2f20.10)") -box_length(3) / 2.0, box_length(3) / 2.0
-        write(unit, "(A)") "ITEM: ATOMS id shapex shapey shapez x y z vx vy vz fx fy fz quatw quati quatj quatk"
+        write(unit, "(A)") "ITEM: ATOMS id type shapex shapey shapez x y z vx vy vz fx fy fz quatw quati quatj quatk"
 
         do I = 1, N
-            write(unit, "(1x, i5, 50f20.10)") I, rad, RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I), FX(I), FY(I), FZ(I), &
+            write(unit, "(1x, 2i5, 50f20.10)") I, rtype(I), shape_x(I), shape_y(I), shape_z(I), RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I), FX(I), FY(I), FZ(I), &
             QW(I), QX(I), QY(I), QZ(I)
         enddo
 
@@ -122,3 +122,84 @@ module config_reporter
     end subroutine close_confwriter_file
     
 end module config_reporter
+
+module checkpoint_reporter
+    use system
+    implicit none
+    character(len=256) :: file
+    integer :: config_index = 0
+
+    contains
+    subroutine open_checkpoint_file( unit, filename )
+        implicit none
+        integer, intent(in) :: unit
+        character(len=*), intent(in) :: filename
+
+        file = filename
+
+        open(unit=unit, file=file, action='write')
+        config_index = 0
+
+    end subroutine open_checkpoint_file
+
+    subroutine report_checkpoint( unit )
+        implicit none
+        integer, intent(in) :: unit
+        integer :: I
+
+        write(unit, *) N
+        write(unit, *) 
+        write(unit, *) box_length(1), box_length(2), box_length(3)
+        write(unit, *)
+        do I = 1, N
+            write(unit, "(1x, I5, 50f20.10)") rtype(I), exc_rad(I), &
+                                          shape_x(I), shape_y(I), shape_z(I), eshape_x(I), eshape_y(I), eshape_z(I), &
+                                          RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I), LX(I), LY(I), LZ(I), QW(I), QX(I), QY(I), QZ(I)
+        enddo
+        write(unit, *)
+        do I = 1, NC
+            write(unit, "(1x, 2I10, f20.10)") BBI(I), BBJ(I), BB_len(I)
+        enddo
+        write(unit, *)
+        write(unit, *) config_index
+
+    end subroutine report_checkpoint
+
+    subroutine load_checkpoint( unit )
+        implicit none
+        integer, intent(in) :: unit
+        integer :: I
+
+        read(unit, *) N
+        read(unit, *)
+        read(unit, *) box_length(1), box_length(2), box_length(3)
+        read(unit, *)
+        do I = 1, N
+            read(unit, "(1x, I5, 50f20.10)") rtype(I), exc_rad(I), &
+                                          shape_x(I), shape_y(I), shape_z(I), eshape_x(I), eshape_y(I), eshape_z(I), &                  
+                                          RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I), LX(I), LY(I), LZ(I), QW(I), QX(I), QY(I), QZ(I)
+        enddo
+        read(unit, *)
+        do I = 1, NC
+            read(unit, "(1x, 2I10, f20.10)") BBI(I), BBJ(I), BB_len(I)
+        enddo
+        read(unit, *)
+        read(unit, *) config_index
+        
+    end subroutine load_checkpoint
+
+    subroutine close_checkpoint_file( unit )
+        implicit none
+        integer, intent(in) :: unit
+
+        close(unit=unit)
+
+    end subroutine close_checkpoint_file
+    
+end module checkpoint_reporter
+
+module reporters
+    use state_data_reporter
+    use trajectory_reporter
+    use config_reporter
+end module reporters
