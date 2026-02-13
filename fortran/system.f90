@@ -1,25 +1,31 @@
 module atom
     implicit none
 
-    real(8) :: mass, charge
-    real(8), dimension(3) :: rad, erad, exc_rad, MOI
+    ! real(8) :: mass, charge
+    ! real(8), dimension(3) :: rad, erad, exc_rad, MOI
+
+    real(8), allocatable, dimension(:) :: mass, charge
+    real(8), allocatable, dimension(:) :: shape_x, shape_y, shape_z, exc_rad
+    real(8), allocatable, dimension(:) :: eshape_x, eshape_y, eshape_z
+    real(8), allocatable, dimension(:) :: Ixx, Iyy, Izz
+    integer, allocatable, dimension(:) :: rtype
 
     real(8), allocatable, dimension(:) :: RX, RY, RZ
     real(8), allocatable, dimension(:) :: VX, VY, VZ
     real(8), allocatable, dimension(:) :: FX, FY, FZ
 
     real(8), allocatable, dimension(:) :: QW, QX, QY, QZ
-    real(8), allocatable, dimension(:) :: WX, WY, WZ
     real(8), allocatable, dimension(:) :: LX, LY, LZ
     real(8), allocatable, dimension(:) :: TX, TY, TZ
+
+    real(8), allocatable, dimension(:) :: RX_old, RY_old, RZ_old
 
 end module atom
 
 module box
     implicit none
 
-    real(8) :: box_length, volume
-    real(8) :: box_xlen, box_ylen, box_zlen
+    real(8) :: box_length(3), volume
     logical :: is_periodic
 
 end module box
@@ -30,18 +36,27 @@ module system
     use xmath
     implicit none
 
-    integer :: N, dof
+    integer :: N, NC, dof
     
-    real(8) :: potential_energy, kinetic_energy, rkinetic_energy, total_energy
+    real(8) :: potential_energy, kinetic_energy, total_energy
     real(8) :: temperature, pressure, density, virial
+    real(8) :: target_temp, target_pres
+
+    integer, dimension(:), allocatable :: BBI, BBJ
+    real(8), dimension(:), allocatable :: BB_len
     
-    logical :: default_mass = .TRUE., default_charge=.TRUE.
-    logical ::rotations_enabled = .FALSE.
-    logical :: box_lengths_set = .FALSE.
-    logical :: num_atoms_set = .FALSE.
-    logical :: density_set = .FALSE.
-    logical :: periodic_set = .FALSE.
-    logical :: fcc_lattice_generated = .FALSE.
+    logical :: default_mass_set     = .TRUE.
+    logical :: default_charge_set   = .TRUE.
+    logical :: default_shape_set    = .TRUE.
+    logical :: default_energy_set   = .TRUE.
+    logical :: rotations_set        = .FALSE.
+    logical :: box_lengths_set      = .FALSE.
+    logical :: num_atoms_set        = .FALSE.
+    logical :: density_set          = .FALSE.
+    logical :: fcc_lattice_set      = .FALSE.
+    logical :: constraints_set      = .FALSE.
+    logical :: target_temp_set      = .FALSE.
+    logical :: target_pres_set      = .FALSE.
 
     contains
 
@@ -53,13 +68,22 @@ module system
         dof = 6 * N
         num_atoms_set = .TRUE.
 
+        allocate( mass(N), charge(N), rtype(N) )
+        allocate( shape_x(N), shape_y(N), shape_z(N), exc_rad(N) )
+        allocate( eshape_x(N), eshape_y(N), eshape_z(N) )
+        allocate( Ixx(N), Iyy(N), Izz(N) )
+
         allocate( RX(N), RY(N), RZ(N) )
         allocate( VX(N), VY(N), VZ(N) )
         allocate( FX(N), FY(N), FZ(N) )
         allocate( LX(N), LY(N), LZ(N) )
         allocate( TX(N), TY(N), TZ(N) )
         allocate( QW(N), QX(N), QY(N), QZ(N) )
-        allocate( WX(N), WY(N), WZ(N) )
+
+        mass = 1.0; charge = 0.0; rtype = 1;
+        shape_x = 1.0; shape_y = 1.0; shape_z = 1.0; exc_rad = 1.0
+        eshape_x = 1.0; eshape_y = 1.0; eshape_z = 1.0
+        Ixx = 0.1; Iyy = 0.1; Izz = 0.1
 
         RX = 0.0; RY = 0.0; RZ = 0.0
         VX = 0.0; VY = 0.0; VZ = 0.0
@@ -67,52 +91,170 @@ module system
         LX = 0.0; LY = 0.0; LZ = 0.0
         TX = 0.0; TY = 0.0; TZ = 0.0
         QW = 1.0; QX = 0.0; QY = 0.0; QZ = 0.0
-        Wx = 0.0; Wy = 0.0; Wz = 0.0
 
     end subroutine set_num_atoms
 
-    subroutine set_density( target_density )
+    subroutine set_num_constraints( num_constraints )
         implicit none
-        
-        real(8), intent(in) :: target_density
-        density_set = .TRUE.
-        density = target_density
+        integer, intent(in) :: num_constraints
 
-    end subroutine set_density
+        constraints_set = .TRUE.
+        NC = num_constraints
+        dof = dof - NC
+
+        allocate( BBI(NC), BBJ(NC), BB_len(NC) )
+        BBI = 0; BBJ = 0; BB_len = 0.0
+
+    end subroutine set_num_constraints
+
+    subroutine set_atom_type( id, atom_type )
+        implicit none
+        integer, intent(in) :: id
+        integer, intent(in) :: atom_type
+
+        if (num_atoms_set .eqv. .FALSE.) then
+            write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
+            stop
+        else if ( id < 1 .or. id > N ) then
+            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
+            in system of ',I10,' atoms.')") id, N
+        else
+            rtype(id) = atom_type
+        endif
+
+    end subroutine set_atom_type
+
+    subroutine set_atom_mass( id, atom_mass )
+        implicit none
+        integer, intent(in) :: id
+        real(8), intent(in) :: atom_mass
+
+        if (num_atoms_set .eqv. .FALSE.) then
+            write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
+            stop
+        else if ( id < 1 .or. id > N ) then
+            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
+            in system of ',I10,' atoms.')") id, N
+        else
+            default_mass_set = .FALSE.
+            mass(id) = atom_mass
+        endif
+
+    end subroutine set_atom_mass
+
+    subroutine set_atom_charge( id, atom_charge )
+        implicit none
+        integer, intent(in) :: id
+        real(8), intent(in) :: atom_charge
+
+        if (num_atoms_set .eqv. .FALSE.) then
+            write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
+            stop
+        else if ( id < 1 .or. id > N ) then
+            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
+            in system of ',I10,' atoms.')") id, N
+        else
+            default_charge_set = .FALSE.
+            charge(id) = atom_charge
+        endif
+
+    end subroutine set_atom_charge
+
+    subroutine set_box( length, width, height )
+        implicit none
+        real(8), intent(in) :: length
+        real(8), optional, intent(in) :: width, height
+
+        box_lengths_set = .TRUE.
+
+        if ( present(width) .and. present(height) ) then
+            box_length(1) = length
+            box_length(2) = width
+            box_length(3) = height
+        else
+            box_length(1) = length
+            box_length(2) = length
+            box_length(3) = length
+        endif
+
+        volume = box_length(1) * box_length(2) * box_length(3)
+
+    end subroutine set_box
 
     subroutine set_periodic_boundary
         implicit none
 
-        periodic_set = .TRUE.
+        is_periodic = .TRUE.
     end subroutine set_periodic_boundary
 
-    subroutine set_shape( length, width, height )
+    subroutine set_target_temperature( temp )
         implicit none
+        real(8), intent(in) :: temp
+
+        target_temp = temp
+        target_temp_set = .TRUE.
+
+    end subroutine set_target_temperature
+
+    subroutine set_target_pressure( pres )
+        implicit none
+        real(8), intent(in) :: pres
+
+        target_pres = pres
+        target_pres_set = .TRUE.
+
+    end subroutine set_target_pressure
+
+    subroutine set_atom_shape( id, length, width, height )
+        implicit none
+        integer, intent(in) :: id
         real(8), intent(in) :: length, width, height
 
-        rad(1) = length
-        rad(2) = width
-        rad(3) = height
+        if (num_atoms_set .eqv. .FALSE.) then
+            write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
+            stop
+        else if ( id < 1 .or. id > N ) then
+            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
+            in system of ',I10,' atoms.')") id, N
+        else
+            default_shape_set = .FALSE.
 
-        MOI(1) = (rad(2)**2 + rad(3)**2) / 20.0
-        MOI(2) = (rad(1)**2 + rad(3)**2) / 20.0
-        MOI(3) = (rad(1)**2 + rad(2)**2) / 20.0
+            shape_x(id) = length
+            shape_y(id) = width
+            shape_z(id) = height
 
-        exc_rad = max( length, width, height )
+            Ixx(id) = ( shape_y(id) ** 2.0 + shape_z(id) ** 2.0 ) / 20.0
+            Iyy(id) = ( shape_x(id) ** 2.0 + shape_z(id) ** 2.0 ) / 20.0
+            Izz(id) = ( shape_x(id) ** 2.0 + shape_y(id) ** 2.0 ) / 20.0
+
+            exc_rad(id) = max( length, width, height )
+        endif
+
     
-    end subroutine set_shape
+    end subroutine set_atom_shape
 
-    subroutine set_energy( eng_x, eng_y, eng_z )
+    subroutine set_atom_energy( id, eng_x, eng_y, eng_z )
         implicit none
+        integer, intent(in) :: id
         real(8), intent(in) :: eng_x, eng_y, eng_z
 
-        erad(1) = eng_x
-        erad(2) = eng_y
-        erad(3) = eng_z
-        
-    end subroutine set_energy
+        if (num_atoms_set .eqv. .FALSE.) then
+            write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
+            stop
+        else if ( id < 1 .or. id > N ) then
+            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
+            in system of ',I10,' atoms.')") id, N
+        else
+            default_energy_set = .FALSE.
 
-    subroutine add_atom_position(id, pos_x, pos_y, pos_z)
+            eshape_x(id) = eng_x
+            eshape_y(id) = eng_y
+            eshape_z(id) = eng_z
+        endif
+        
+    end subroutine set_atom_energy
+
+    subroutine set_atom_position(id, pos_x, pos_y, pos_z)
         implicit none
 
         integer, intent(in) :: id
@@ -130,9 +272,9 @@ module system
             RZ(id) = pos_z
         endif
 
-    end subroutine add_atom_position
+    end subroutine set_atom_position
 
-    subroutine add_atom_velocity(id, vel_x, vel_y, vel_z)
+    subroutine set_atom_velocity(id, vel_x, vel_y, vel_z)
         implicit none
 
         integer, intent(in) :: id
@@ -150,7 +292,27 @@ module system
             VZ(id) = vel_z
         endif
 
-    end subroutine add_atom_velocity
+    end subroutine set_atom_velocity
+
+    subroutine add_constraint(id, I, J, length)
+        implicit none
+        integer, intent(in) :: id
+        integer, intent(in) :: I, J
+        real(8), intent(in) :: length
+
+        if (constraints_set .eqv. .FALSE.) then
+            write(*, "(1x, 'Error: System has no constraints. Set number of constraints first.')")
+            stop
+        else if ( id < 1 .or. id > NC ) then
+            write(*, "(1x, 'Error: Constraint index ', I10,' does not exist &
+            in system of ',I10,' constraints.')") id, N
+        else
+            BBI(id) = I
+            BBJ(id) = J
+            BB_len(id) = length
+        endif
+
+    end subroutine add_constraint
 
     subroutine set_velocty_to_temperature( rtemp )
         implicit none
@@ -201,39 +363,38 @@ module system
 
         potential_energy = 0.0
         kinetic_energy = 0.0
-        rkinetic_energy = 0.0
         temperature = 0.0
         pressure = 0.0
         virial = 0.0
     end subroutine initialize_forces
 
-    subroutine generate_fcc_lattice( unit_cells )
+    subroutine generate_fcc_lattice( unit_cells, dens )
         implicit none
         integer, intent(in) :: unit_cells
-        integer :: num_atoms, mtemp, I, J, K, IREF
-        real(8)    :: cell, half_cell, rroot3
+        real(8), intent(in) :: dens
+        integer             :: num_atoms, mtemp, I, J, K, IREF
+        real(8)             :: cell, half_cell, rroot3
 
-        fcc_lattice_generated = .TRUE.
+        fcc_lattice_set = .TRUE.
         num_atoms = 4 * unit_cells ** 3
         call set_num_atoms( num_atoms )
 
         if ( box_lengths_set .eqv. .FALSE. ) then
 
-            if (density_set .eqv. .FALSE.) then
-                write(*, "(1x, 'Error: Density not set. Set density before &
-                generating FCC lattice.')")
-                stop
+            box_lengths_set = .TRUE.
+            
+            if (dens == 0.0) then
+                write(*, "(1x, 'Error: Density cannot be zero.')")
+            else
+                density_set = .TRUE.
+                density = dens
+                volume = real(N) / density
+                box_length = volume ** (1.0/3.0)
             endif
 
-            box_lengths_set = .TRUE.
-            volume = real(N) / density
-            box_length = volume ** (1.0/3.0)
-            box_xlen = box_length
-            box_ylen = box_length
-            box_zlen = box_length
         endif
 
-        cell = box_length / real(unit_cells)
+        cell = box_length(3) / real(unit_cells)
         half_cell = cell / 2.0
         rroot3 = 1.0 / sqrt(3.0)
 
@@ -290,9 +451,9 @@ module system
             enddo
         enddo
 
-        RX = RX - box_length / 2.0
-        RY = RY - box_length / 2.0
-        RZ = RZ - box_length / 2.0
+        RX = RX - box_length(1) / 2.0
+        RY = RY - box_length(2) / 2.0
+        RZ = RZ - box_length(3) / 2.0
 
     end subroutine generate_fcc_lattice
 
@@ -310,47 +471,64 @@ module system
             stop
         endif
 
-        if (density_set) then
-            write(*, "(1x, 'Density of system set to ', f10.5, ' atoms per cubic unit cell')") density
+        if (box_lengths_set) then
+            write(*, "(1x, 'Box dimensions set to ', 3f10.5)") box_length
+
+            if (density_set) then
+                write(*, "(1x, 'Density of system set to ', f10.5)") density
+            else
+                density = real(N) / volume
+                density_set = .TRUE.
+                write(*, "(1x, 'Density of system set to ', f10.5)") density
+            endif
+
         else
-            write(*, "(1x, 'Error: Density not set. Set density before initializing system.')")
+            write(*, "(1x, 'Error: Box dimensions not set. Set box dimensions &
+            before initializing system.')")
             stop
         endif
-
-        if (box_lengths_set) then
-            write(*, "(1x, 'Box length set to ', f10.5)") box_length
-        else
-            box_lengths_set = .TRUE.
-            volume = real(N) / density
-            box_length = volume ** (1.0/3.0)
-            box_xlen = box_length
-            box_ylen = box_length
-            box_zlen = box_length
-        endif
-
-        if (periodic_set) then
+            
+        if (is_periodic) then
             write(*, "(1x, 'Periodic boundary conditions enabled for current system')")
         else
             write(*, "(1x, 'Periodic boundary conditions disabled for current system')")
         endif
 
-        if (default_mass) then
+        if (default_mass_set) then
             mass = 1.0
+            write(*, "(1x, 'Default mass for atoms set to ', f10.5)") mass(1)
         endif
-        if (default_charge) then
+        if (default_charge_set) then
             charge = 0.0
+            write(*, "(1x, 'Default charge for atoms set to ', f10.5)") charge(1)
+        endif
+        if (default_shape_set) then
+            shape_x = 1.0; shape_y = 1.0; shape_z = 1.0
+
+            Ixx = ( shape_y(1) ** 2.0 + shape_z(1) ** 2.0 ) / 20.0
+            Iyy = ( shape_x(1) ** 2.0 + shape_z(1) ** 2.0 ) / 20.0
+            Izz = ( shape_x(1) ** 2.0 + shape_y(1) ** 2.0 ) / 20.0
+
+            exc_rad = 1.0
+            write(*, "(1x, 'Default shape for atoms set to ', f10.5)") shape_x(1)
+        endif
+        if (default_energy_set) then
+            eshape_x = 1.0; eshape_y = 1.0; eshape_z = 1.0
+            write(*, "(1x, 'Default energy for atoms set to ', f10.5)") eshape_x(1)
         endif
 
-        ! write(*, "(1x, 'Mass of particles set to ', f10.5)") mass
-        ! write(*, "(1x, 'Charge of particles set to ', f10.5)") charge
-
-        call initialize_forces
-
-        if (fcc_lattice_generated) then
+        if (fcc_lattice_set) then
             write(*, "(1x, 'FCC lattice generated with ', i10, ' particles')") N
         endif
 
+        Ixx = Ixx * mass
+        Iyy = Iyy * mass
+        Izz = Izz * mass
+        
         write(*, "(1x, 'System initialization complete.')")
+
+        call initialize_forces
+
         write(*, *)
 
     end subroutine initialize_system
@@ -358,10 +536,12 @@ module system
     subroutine calculate_state_variables()
         implicit none
 
-        kinetic_energy = kinetic_energy + 0.5 * mass * SUM( VX ** 2 + VY ** 2 + VZ ** 2 )
-        total_energy = potential_energy + kinetic_energy + rkinetic_energy
+        kinetic_energy = kinetic_energy + 0.5 * SUM( mass * ( VX ** 2 + VY ** 2 + VZ ** 2 ) )
+        total_energy = potential_energy + kinetic_energy
 
         temperature = 2.0 * kinetic_energy / dble(dof)
+
+        virial = virial + SUM( RX * FX + RY * FY + RZ * FZ )
 
         if (volume > 0.0) then
             pressure = (density * temperature) + (virial / (3.0 * volume) )
@@ -369,9 +549,13 @@ module system
 
         potential_energy = potential_energy / dble(N)
         kinetic_energy = kinetic_energy / dble(N)
-        rkinetic_energy = rkinetic_energy / dble(N)
         total_energy = total_energy / dble(N)
 
     end subroutine calculate_state_variables
+
+    ! subroutine copy_translation( from, to, offset )
+    !     implicit none
+
+    ! end subroutine copy_translation
 
 end module system

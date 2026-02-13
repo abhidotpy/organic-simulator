@@ -355,177 +355,6 @@ module xmath
 
     end function radians_to_degrees
 
-    pure function golden_section_search(func, args) result(res)
-        implicit none
-        integer, parameter :: max_iter = 1000
-        real(8) :: eps, phi, a, b, x1, x2, fx1, fx2
-        real(8) :: res
-        real(8), dimension(:), intent(in) :: args
-        integer :: count
-
-        interface
-            pure function func(x, argv) result (out)
-                implicit none
-                real(8), intent(in) :: x
-                real(8), dimension(:), intent(in) :: argv
-                real(8) :: out
-            end function func
-        end interface
-
-        eps = 1e-8; phi = 0.5 * ( 3.0 - sqrt(5.0) )
-        a = 0.0; b = 1.0;
-        x1 = (1 - phi) * a + phi * b
-        x2 = phi * a + (1 - phi) * b
-        fx1 = func(x1, args)
-        fx2 = func(x2, args)
-        count = 0;
-
-        do while ( abs(x2 - x1) > eps .and. count < max_iter )
-            count = count + 1
-
-            if ( fx1 < fx2 ) then
-                b = x2
-                x2 = x1;  fx2 = fx1
-                x1 = (1 - phi) * a + phi * b
-                fx1 = func(x1, args)
-            
-            else
-                a = x1
-                x1 = x2; fx1 = fx2
-                x2 = phi * a + (1 - phi) * b
-                fx2 = func(x2, args)
-            endif
-        enddo
-
-        res = (x1 + x2) / 2.0
-
-    end function golden_section_search
-
-    ! real function brent(func, args) result (res)
-    !     implicit none
-    !     integer, parameter :: max_iter = 10000
-    !     real(8), parameter    :: eps = 1e-8, phi = 0.5 * ( 3.0 - sqrt(5.0) )
-    !     real(8)               :: a, b, c, x, w, v, u
-    !     real(8)               :: fa, fb, fc, fx, fw, fv, fu
-    !     real(8)               :: deltax = 0.0, atol = 1e-11, rtol = 1e-8
-    !     real(8)               :: tol1, tol2, xmid, tmp1, tmp2, rat, p, dx_temp
-    !     integer            :: I, iter = 0
-
-    !     interface
-    !         real function func(xx, argv)
-    !             real(8), intent(in) :: xx
-    !             real(8), intent(in) :: argv(:)
-    !         end function func
-    !     end interface
-
-    !     a = 0.0; b = 1.0 
-    !     c = (1 - phi) * a + phi * b
-    !     fa = func(a); fb = func(b); fc = func(c)
-    !     v = c; w = v; x = w
-    !     fv = fc; fw = fv; fx = fw
-
-    !     do while (iter < max_iter)
-    !         tol1 = rtol * abs(x) + atol
-    !         tol2 = 2.0 * tol1
-    !         xmid = 0.5 * (a + b)
-
-    !         if (abs(x - xmid) < (tol2 - 0.5 * (b - a))) exit
-
-    !         if (abs(deltax) <= tol1) then
-    !             if (x >= xmid) then
-    !                 deltax = a - x
-    !             else
-    !                 deltax = b - x
-    !             endif
-    !             rat = phi * deltax
-
-    !         else
-    !             tmp1 = (x - w) * (fx - fv)
-    !             tmp2 = (x - v) * (fx - fw)
-    !             p = (x - v) * tmp2 - (x - w) * tmp1
-    !             tmp2 = 2.0 * (tmp2 - tmp1)
-
-    !             if (tmp2 > 0.0) p = -p
-
-    !             tmp2 = abs(tmp2)
-    !             dx_temp = deltax
-    !             deltax = rat
-                
-    !             if ((p > tmp2 * (a - x)) .and. (p < tmp2 * (b - x)) .and. (abs(p) < abs(0.5 * tmp2 * dx_temp))) then
-    !                 rat = p * 1.0 / tmp2
-    !                 u = x + rat
-    !                 if ((u - a) < tol2 .or. (b - u) < tol2) then
-    !                     if (xmid - x >= 0) then
-    !                         rat = tol1
-    !                     else
-    !                         rat = -tol1
-    !                     endif
-    !                 endif
-    !             else
-    !                 if (x >= xmid) then
-    !                     deltax = a - x 
-    !                 else
-    !                     deltax = b - x
-    !                 endif
-    !                 rat = phi * deltax
-    !             endif
-    !         endif
-
-    !         if (abs(rat) < tol1) then
-    !             if (rat >= 0) then
-    !                 u = x + tol1
-    !             else
-    !                 u = x - tol1
-    !             endif
-    !         else
-    !             u = x + rat
-
-    !         endif
-
-    !         fu = func(u)
-
-    !         if (fu > fx) then
-
-    !             if (u < x) then
-    !                 a = u
-    !             else
-    !                 b = u
-    !             endif
-
-    !             if ((fu <= fw) .or. (w == x)) then
-    !                 v = w
-    !                 w = u
-    !                 fv = fw
-    !                 fw = fu
-
-    !             else if ((fu <= fv) .or. (v == x) .or. (v == w)) then
-    !                 v = u
-    !                 fv = fu
-    !             endif
-
-    !         else
-
-    !             if (u >= x) then
-    !                 a = x
-    !             else
-    !                 b = x
-    !             endif
-
-    !             v = w
-    !             w = x
-    !             x = u
-    !             fv = fw
-    !             fw = fx
-    !             fx = fu
-
-    !         endif
-    !         iter = iter + 1
-    
-    !     enddo
-
-    !     res = x
-    ! end function brent
-
     subroutine normal_distribution( rand )
         implicit none
         real(8), intent(out) :: rand
@@ -552,11 +381,11 @@ module xmath
 
     end subroutine normal_distribution
 
-    subroutine normal_sequences(num, noise1, noise2 )
+    subroutine normal_sequences( num, noise1, noise2 )
         implicit none
         integer, intent(in) :: num
-        real, dimension(num), intent(out) :: noise1, noise2
-        real, dimension(num) :: unf_noise1, unf_noise2
+        real(8), dimension(num), intent(out) :: noise1, noise2
+        real(8), dimension(num) :: unf_noise1, unf_noise2
 
         call random_number(unf_noise1)
         call random_number(unf_noise2)
@@ -564,6 +393,47 @@ module xmath
         noise1 = sqrt(-2.0 * log(unf_noise1)) * cos(2.0 * pi * unf_noise2)
         noise2 = sqrt(-2.0 * log(unf_noise1)) * sin(2.0 * pi * unf_noise2)
 
-    end subroutine
+    end subroutine normal_sequences
+
+    PURE FUNCTION polyval ( x, c ) RESULT ( f )
+        IMPLICIT NONE
+        REAL(8)                            :: f ! Returns polynomial in ...
+        REAL(8),                INTENT(in) :: x ! argument
+        REAL(8), DIMENSION(0:), INTENT(in) :: c ! given coefficients (ascending powers of x)
+
+        ! Uses Horner's rule
+        
+        INTEGER :: i, upper
+
+        upper = UBOUND(c,1)
+        f = c(upper)
+        DO i = upper - 1, 0, -1
+        f = f * x + c(i)
+        END DO
+    END FUNCTION polyval
+
+    PURE FUNCTION exprel ( x ) RESULT ( f )
+        IMPLICIT NONE
+        REAL(8), INTENT(in) :: x ! Argument
+        REAL(8)             :: f ! Returns value of (exp(x)-1)/x
+
+        ! At small x, we must guard against the ratio of imprecise small values.
+        ! There are various ways of doing this.
+        ! We follow some others and use the identity: (exp(x)-1)/x = exp(x/2)*[sinh(x/2)/(x/2)].
+        ! For small x, sinh(x)/x = g0 + g1*x**2 + g2*x**4 + ...
+        ! where the coefficient of x**(2n) is gn = 1/(2*n+1)!
+        ! Alternatively, the exprel function is available in some math and scientific libraries.
+
+        REAL(8), DIMENSION(0:4), PARAMETER :: g = 1.0 / [1,6,120,5040,362880]
+        REAL(8),                 PARAMETER :: tol = 0.01
+
+        IF ( ABS(x) > tol ) THEN
+        f = ( EXP(x) - 1.0 ) / x
+        ELSE
+        f = EXP(x/2) * polyval ( (x/2)**2, g )
+        END IF
+
+    END FUNCTION exprel
+
 
 end module
