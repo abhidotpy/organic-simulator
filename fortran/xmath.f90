@@ -393,7 +393,7 @@ module xmath
         noise1 = sqrt(-2.0 * log(unf_noise1)) * cos(2.0 * pi * unf_noise2)
         noise2 = sqrt(-2.0 * log(unf_noise1)) * sin(2.0 * pi * unf_noise2)
 
-    end subroutine
+    end subroutine normal_sequences
 
     PURE FUNCTION polyval ( x, c ) RESULT ( f )
         IMPLICIT NONE
