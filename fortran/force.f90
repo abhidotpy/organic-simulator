@@ -117,6 +117,54 @@ module lennard_jones12
 
 end module lennard_jones12
 
+module wca
+    use system
+    implicit none
+
+    real(8) :: epsilon = 1.0
+    real(8) :: sigma = 1.0
+
+    contains
+    subroutine wca_calculate_forces( I, J )
+        implicit none
+        integer, intent(in)           :: I, J
+        real(8), dimension(3)         :: RIJ, FIJ
+        real(8)                       :: rij_sq, sigma_sq, sr2_lj
+        real(8)                       :: coeff, pot
+
+
+        RIJ(1) = RX(I) - RX(J)
+        RIJ(2) = RY(I) - RY(J)
+        RIJ(3) = RZ(I) - RZ(J)
+
+        if (is_periodic) then
+            RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
+        endif
+
+        rij_sq = SUM( RIJ ** 2.0 )
+        sigma_sq = ( (shape_z(I) + shape_z(J)) / 2.0 ) ** 2.0
+        sr2_lj = sigma_sq / rij_sq
+
+        if ( rij_sq <= sigma_sq ) then
+            pot = epsilon * ( sr2_lj**6.0 - 2.0*sr2_lj**3.0 )
+            coeff = 12.0 * epsilon * (sr2_lj**6 - sr2_lj**3)
+            
+            potential_energy = potential_energy + pot
+            FIJ = coeff * RIJ / rij_sq
+
+            FX(I) = FX(I) + FIJ(1)
+            FY(I) = FY(I) + FIJ(2)
+            FZ(I) = FZ(I) + FIJ(3)
+            
+            FX(J) = FX(J) - FIJ(1)
+            FY(J) = FY(J) - FIJ(2)
+            FZ(J) = FZ(J) - FIJ(3)
+        endif
+
+    end subroutine wca_calculate_forces
+
+end module wca
+
 module morse
     use system
     implicit none
@@ -169,7 +217,6 @@ module gay_berne
     
     real(8), dimension(3), public :: U1, U2, RIJ, RIJ_cut
     real(8), dimension(3), public :: FIJ, TI, TJ, TORQ1, TORQ2
-    real(8), dimension(3), public :: FIJ_cut, TI_cut, TJ_cut, TORQ1_cut, TORQ2_cut
     public :: gb_calculate_forces
     
     private
@@ -228,13 +275,23 @@ module gay_berne
         
     end function dG_du2
 
-    subroutine gb_calculate_forces( I, J, cutoff, wf )
+    subroutine gb_calculate_forces( I, J, cutoff, width )
         implicit none
         integer, intent(in)             :: I, J
-        real(8), optional               :: wf
+        real(8), optional               :: width
         real(8), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2
         real(8), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
-        real(8)                         :: pot, pot_cut, cutoff
+        real(8)                         :: pot, cutoff, wf
+        real(8)                         :: switch, xx, sx, sdx, factor
+        logical                         :: imp_wat = .FALSE.
+
+        if (present(width)) then
+            wf = width
+            imp_wat = .TRUE.
+        else
+            wf = 0.0
+            imp_wat = .FALSE.
+        endif
 
         RIJ(1) = RX(I) - RX(J)
         RIJ(2) = RY(I) - RY(J)
@@ -267,100 +324,75 @@ module gay_berne
         eps2 = g_func( xhi )
         sigma = shape_x(I) * g_func( chi ) ** (-1.0 / 2.0)
 
-        if (present(wf)) then
-            if ( rij_mag < sigma ) then
-                sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
-            else if (rij_mag .ge. sigma .and. rij_mag .le. (sigma + wf)) then
-                sr = sigma_0 / ( sigma - sigma + sigma_0 )
+        switch = ( cutoff + wf ) - 2.0 * sigma_0    ! Apply switch function 2sigma_0 inside cutoff
+        factor = 1.0 / ( ( cutoff + wf ) - switch )
+        xx = ( RIJ_MAG - switch ) * factor
+        sx = 1.0 - 6.0 * xx ** 5.0 + 15.0 * xx ** 4.0 - 10.0 * xx ** 3.0
+        sdx = -30.0 * xx ** 4.0 + 60.0 * xx ** 3.0 - 30.0 * xx ** 2.0
+
+        if ( rij_mag < ( sigma + cutoff + wf ) ) then
+
+            if (imp_wat) then
+                if ( rij_mag < sigma ) then
+                    sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
+                else if ((rij_mag .ge. sigma) .and. (rij_mag .le. (sigma + wf))) then
+                    sr = sigma_0 / ( sigma - sigma + sigma_0 )
+                else
+                    sr = sigma_0 / ( rij_mag - sigma + sigma_0 - wf )
+                endif
             else
-                sr = sigma_0 / ( rij_mag - sigma + sigma_0 - wf )
+                sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
             endif
-        else
-            sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
-        endif
 
-        dR_dr   = (1.0 / sigma_0) * (( RIJ / rij_mag ) + 0.5 * shape_x(I) * dG_dr( chi ) * g_func( chi ) ** (-3.0 / 2.0))
-        de2_dr  = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_dr( xhi )
+            dR_dr   = (1.0 / sigma_0) * (( RIJ / rij_mag ) + 0.5 * shape_x(I) * dG_dr( chi ) * g_func( chi ) ** (-3.0 / 2.0))
+            de2_dr  = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_dr( xhi )
 
-        de1_du1 = (eps2 ** meu) * neu * eps1 ** (neu + 2) * (chi ** 2 * uu * U2)
-        de2_du1 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * dG_du1( xhi )
-        dR_du1  = (12.0 * sr**7 - 12.0 * sr**13) * 0.5 * (shape_x(I) / sigma_0) * dG_du1( chi ) * g_func( chi ) ** (-3.0 / 2.0)
+            de1_du1 = (eps2 ** meu) * neu * eps1 ** (neu + 2) * (chi ** 2 * uu * U2)
+            de2_du1 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * dG_du1( xhi )
+            dR_du1  = (12.0 * sr**7 - 12.0 * sr**13) * 0.5 * (shape_x(I) / sigma_0) * dG_du1( chi ) * g_func( chi ) ** (-3.0 / 2.0)
 
-        de1_du2 = (eps2 ** meu) * neu * eps1 ** (neu + 2) * (chi ** 2 * uu * U1)
-        de2_du2 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * dG_du2( xhi )
-        dR_du2  = (12.0 * sr**7 - 12.0 * sr**13) * 0.5 * (shape_x(I) / sigma_0) * dG_du2( chi ) * g_func( chi ) ** (-3.0 / 2.0)
-    
-        pot = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - 2.0 * sr ** 6.0)
-        FIJ = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_dr  + de2_dr * (sr ** 12.0 - 2.0 * sr ** 6.0))
-        TI  = (-1.0) * ((sr ** 12.0 - 2.0 * sr ** 6.0) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * dR_du1))
-        TJ  = (-1.0) * ((sr ** 12.0 - 2.0 * sr ** 6.0) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * dR_du2))
-        TORQ1 = cross( U1, TI )
-        TORQ2 = cross( U2, TJ )
-
-        ! CALCULATE CUTOFF PARAMETERS
-
-        RIJ_cut = cutoff * (RIJ / rij_mag)
-        RIJ = RIJ_cut
-
-        if (is_periodic) then
-            RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
-        endif
-
-        RIJ_SQ = cutoff ** 2.0
-        RIJ_MAG = cutoff
+            de1_du2 = (eps2 ** meu) * neu * eps1 ** (neu + 2) * (chi ** 2 * uu * U1)
+            de2_du2 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * dG_du2( xhi )
+            dR_du2  = (12.0 * sr**7 - 12.0 * sr**13) * 0.5 * (shape_x(I) / sigma_0) * dG_du2( chi ) * g_func( chi ) ** (-3.0 / 2.0)
         
-        ru1 = dot( RIJ, U1 )
-        ru2 = dot( RIJ, U2 )
-        eps2 = g_func( xhi )
-        sigma = shape_x(I) * g_func( chi ) ** (-1.0 / 2.0)
+            pot = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - 2.0 * sr ** 6.0)
+            FIJ = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_dr  + de2_dr * (sr ** 12.0 - 2.0 * sr ** 6.0))
+            TI  = (-1.0) * ((sr ** 12.0 - 2.0 * sr ** 6.0) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * dR_du1))
+            TJ  = (-1.0) * ((sr ** 12.0 - 2.0 * sr ** 6.0) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * dR_du2))
+            TORQ1 = cross( U1, TI )
+            TORQ2 = cross( U2, TJ )
 
-        if (present(wf)) then
-            if ( rij_mag < sigma ) then
-                sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
-            else if (rij_mag .ge. sigma .and. rij_mag .le. (sigma + wf)) then
-                sr = sigma_0 / ( sigma - sigma + sigma_0 )
-            else
-                sr = sigma_0 / ( rij_mag - sigma + sigma_0 - wf )
+            if ((rij_mag .ge. switch) .and. (rij_mag .le. (cutoff + wf))) then
+                pot   = sx * pot
+                FIJ   = sx * FIJ   - sdx * pot * factor
+                TORQ1 = sx * TORQ1 - sdx * pot * factor
+                TORQ2 = sx * TORQ2 - sdx * pot * factor
             endif
+
         else
-            sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
+            pot = 0.0
+            FIJ = 0.0
+            TORQ1 = 0.0
+            TORQ2 = 0.0
         endif
 
-        dR_dr   = (1.0 / sigma_0) * (( RIJ / rij_mag ) + 0.5 * shape_x(I) * dG_dr( chi ) * g_func( chi ) ** (-3.0 / 2.0))
-        de2_dr  = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_dr( xhi )
-
-        de1_du1 = (eps2 ** meu) * neu * eps1 ** (neu + 2) * (chi ** 2 * uu * U2)
-        de2_du1 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * dG_du1( xhi )
-        dR_du1  = (12.0 * sr**7 - 12.0 * sr**13) * 0.5 * (shape_x(I) / sigma_0) * dG_du1( chi ) * g_func( chi ) ** (-3.0 / 2.0)
-
-        de1_du2 = (eps2 ** meu) * neu * eps1 ** (neu + 2) * (chi ** 2 * uu * U1)
-        de2_du2 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * dG_du2( xhi )
-        dR_du2  = (12.0 * sr**7 - 12.0 * sr**13) * 0.5 * (shape_x(I) / sigma_0) * dG_du2( chi ) * g_func( chi ) ** (-3.0 / 2.0)
-    
-        pot_cut   = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - 2.0 * sr ** 6.0)
-        FIJ_cut   = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_dr  + de2_dr * (sr ** 12.0 - 2.0 * sr ** 6.0))
-        TI_cut    = (-1.0) * ((sr ** 12.0 - 2.0 * sr ** 6.0) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * dR_du1))
-        TJ_cut    = (-1.0) * ((sr ** 12.0 - 2.0 * sr ** 6.0) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * dR_du2))
-        TORQ1_cut = cross( U1, TI_cut )
-        TORQ2_cut = cross( U2, TJ_cut )
-
-        potential_energy = potential_energy + pot - pot_cut
-
-        FX(I) = FX(I) + ( FIJ(1) - FIJ_cut(1) )
-        FY(I) = FY(I) + ( FIJ(2) - FIJ_cut(2) )
-        FZ(I) = FZ(I) + ( FIJ(3) - FIJ_cut(3) )
-
-        FX(J) = FX(J) - ( FIJ(1) - FIJ_cut(1) )
-        FY(J) = FY(J) - ( FIJ(2) - FIJ_cut(2) )
-        FZ(J) = FZ(J) - ( FIJ(3) - FIJ_cut(3) )
-
-        TX(I) = TX(I) + ( TORQ1(1) - TORQ1_cut(1) )
-        TY(I) = TY(I) + ( TORQ1(2) - TORQ1_cut(2) )
-        TZ(I) = TZ(I) + ( TORQ1(3) - TORQ1_cut(3) )
-
-        TX(J) = TX(J) + ( TORQ2(1) - TORQ2_cut(1) )
-        TY(J) = TY(J) + ( TORQ2(2) - TORQ2_cut(2) )
-        TZ(J) = TZ(J) + ( TORQ2(3) - TORQ2_cut(3) )
+        potential_energy = potential_energy + pot
+        
+        FX(I) = FX(I) + FIJ(1)
+        FY(I) = FY(I) + FIJ(2)
+        FZ(I) = FZ(I) + FIJ(3)
+        
+        FX(J) = FX(J) - FIJ(1)
+        FY(J) = FY(J) - FIJ(2)
+        FZ(J) = FZ(J) - FIJ(3)
+        
+        TX(I) = TX(I) + TORQ1(1)
+        TY(I) = TY(I) + TORQ1(2)
+        TZ(I) = TZ(I) + TORQ1(3)
+        
+        TX(J) = TX(J) + TORQ2(1)
+        TY(J) = TY(J) + TORQ2(2)
+        TZ(J) = TZ(J) + TORQ2(3)
 
     end subroutine gb_calculate_forces
 
@@ -377,7 +409,6 @@ module ecp
     
     real(8)                  :: meu = 1.0, neu = 2.0
     real(8), dimension(3)    :: RIJ, RIJ_hat, FIJ, TORQ1, TORQ2
-    real(8), dimension(3)    :: RIJ_cut, FIJ_cut, TORQ1_cut, TORQ2_cut
     real(8)                  :: RIJ_SQ, RIJ_mag
     real(8)                  :: eps1, eps2, sr, phi, sigma, sigma_0 = 1.0
 
@@ -550,15 +581,25 @@ module ecp
         res = coeff * cross( K_vec, matmul( K_vec, M_mat ) )
     end function dF_du
 
-    subroutine ecp_calculate_forces( I, J, cutoff, wf )
+    subroutine ecp_calculate_forces( I, J, cutoff, width )
         implicit none
         integer, intent(in)             :: I, J
-        real(8), optional, intent(in)   :: wf
+        real(8), optional, intent(in)   :: width
         real(8), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2
         real(8), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
         real(8)                         :: e10, e20, sigma_t1, sigma_t2, sigma_t
-        real(8)                         :: pot, pot_cut, cutoff
+        real(8)                         :: pot, cutoff, wf
+        real(8)                         :: switch, xx, sx, sdx, factor
+        logical                         :: imp_wat = .FALSE.
         integer                         :: IX
+
+        if (present(width)) then
+            wf = width
+            imp_wat = .TRUE.
+        else
+            wf = 0.0
+            imp_wat = .FALSE.
+        endif
         
         RIJ(1) = RX(I) - RX(J)
         RIJ(2) = RY(I) - RY(J)
@@ -644,46 +685,68 @@ module ecp
         KR = inverse( GR ) .x. RIJ
         phi = lambda_R * (1.0 - lambda_R) * dot( RIJ_hat, KR ) / RIJ_mag
         sigma = phi ** (-1.0/2.0)
+
+        switch = ( cutoff + wf ) - 2.0 * sigma_0    ! Apply switch function 2sigma_0 inside cutoff
+        factor = 1.0 / ( ( cutoff + wf ) - switch )
+        xx = ( RIJ_MAG - switch ) * factor
+        sx = 1.0 - 6.0 * xx ** 5.0 + 15.0 * xx ** 4.0 - 10.0 * xx ** 3.0
+        sdx = -30.0 * xx ** 4.0 + 60.0 * xx ** 3.0 - 30.0 * xx ** 2.0
+
+        if ( rij_mag < ( sigma + cutoff + wf ) ) then
         
-        if (present(wf)) then
-            if ( rij_mag < sigma ) then
-                sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
-            else if (rij_mag .ge. sigma .and. rij_mag .le. (sigma + wf)) then
-                sr = sigma_0 / ( sigma - sigma + sigma_0 )
+            if (imp_wat) then
+                if ( rij_mag < sigma ) then
+                    sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
+                else if ((rij_mag .ge. sigma) .and. (rij_mag .le. (sigma + wf))) then
+                    sr = sigma_0 / ( sigma - sigma + sigma_0 )
+                else
+                    sr = sigma_0 / ( rij_mag - sigma + sigma_0 - wf )
+                endif
             else
-                sr = sigma_0 / ( rij_mag - sigma + sigma_0 - wf )
+                sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
             endif
+            
+            dR_dr = (1.0 / sigma_0) * (( RIJ_hat ) + 0.5 * dF_dr( lambda_R, KR ) * phi ** (-3.0 / 2.0))
+            de2_dr = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dF_dr( lambda_E, KE )
+            
+            de1_du1 = 0.0;
+            MM1 = transpose(U1) .x. S1
+            do IX = 1, 3
+                de1_du1 = de1_du1 + cross( MM1(:, IX), EM .x. MM1(:, IX) )
+            enddo
+            
+            de1_du1 = -(eps2 ** meu) * (neu * eps1 ** neu) * de1_du1
+            de2_du1 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * (1 - lambda_E) * dF_du( lambda_E, KE, AE )
+            dR_du1 =  (0.5 / sigma_0) * (1 - lambda_R) * dF_du( lambda_R, KR, AR ) * phi ** (-3.0 / 2.0)
+            
+            de1_du2 = 0.0
+            MM2 = transpose(U2) .x. S2
+            do IX = 1, 3
+                de1_du2 = de1_du2 + cross( MM2(:, IX), EM .x. MM2(:, IX) )
+            enddo
+            
+            de1_du2 = -(eps2 ** meu) * (neu * eps1 ** neu) * de1_du2
+            de2_du2 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * lambda_E * dF_du( lambda_E, KE, BE )
+            dR_du2 =  (0.5 / sigma_0) * lambda_R * dF_du( lambda_R, KR, BR ) * phi ** (-3.0 / 2.0)
+            
+            pot   = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - 2.0 * sr ** 6.0)
+            FIJ   = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_dr  + (sr**12 - 2.0*sr**6) * de2_dr)
+            TORQ1 = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_du1))
+            TORQ2 = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_du2))
+
+            if ((rij_mag .ge. switch) .and. (rij_mag .le. (cutoff + wf))) then
+                pot   = sx * pot
+                FIJ   = sx * FIJ   - sdx * pot * factor
+                TORQ1 = sx * TORQ1 - sdx * pot * factor
+                TORQ2 = sx * TORQ2 - sdx * pot * factor
+            endif
+
         else
-            sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
+            pot = 0.0
+            FIJ = 0.0
+            TORQ1 = 0.0
+            TORQ2 = 0.0
         endif
-        
-        dR_dr = (1.0 / sigma_0) * (( RIJ_hat ) + 0.5 * dF_dr( lambda_R, KR ) * phi ** (-3.0 / 2.0))
-        de2_dr = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dF_dr( lambda_E, KE )
-        
-        de1_du1 = 0.0;
-        MM1 = transpose(U1) .x. S1
-        do IX = 1, 3
-            de1_du1 = de1_du1 + cross( MM1(:, IX), EM .x. MM1(:, IX) )
-        enddo
-        
-        de1_du1 = -(eps2 ** meu) * (neu * eps1 ** neu) * de1_du1
-        de2_du1 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * (1 - lambda_E) * dF_du( lambda_E, KE, AE )
-        dR_du1 =  (0.5 / sigma_0) * (1 - lambda_R) * dF_du( lambda_R, KR, AR ) * phi ** (-3.0 / 2.0)
-        
-        de1_du2 = 0.0
-        MM2 = transpose(U2) .x. S2
-        do IX = 1, 3
-            de1_du2 = de1_du2 + cross( MM2(:, IX), EM .x. MM2(:, IX) )
-        enddo
-        
-        de1_du2 = -(eps2 ** meu) * (neu * eps1 ** neu) * de1_du2
-        de2_du2 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * lambda_E * dF_du( lambda_E, KE, BE )
-        dR_du2 =  (0.5 / sigma_0) * lambda_R * dF_du( lambda_R, KR, BR ) * phi ** (-3.0 / 2.0)
-        
-        pot   = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - 2.0 * sr ** 6.0)
-        FIJ   = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_dr  + (sr**12 - 2.0*sr**6) * de2_dr)
-        TORQ1 = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_du1))
-        TORQ2 = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_du2))
         
         potential_energy = potential_energy + pot
         
@@ -939,10 +1002,10 @@ module constraints
 
                         vdot = dot( RIJ, RIJ_old )
 
-                        ! write(*, *) chi, vdot, len, sum(RIJ**2), sum(RIJ_old**2)
-
                         if (vdot < r_tol * len ** 2.0) then
-                            stop "Constraint failure. SB position multipliers exploded !!"
+                            write(*, "(5F10.5)") chi, vdot, len, sum(RIJ**2), sum(RIJ_old**2)
+                            write(*, "('Constraint failure between atoms ', I0, ' and ', I0)") I, J
+                            stop
                         endif
 
                         L_ij = chi / ( 4.0 * vdot )

@@ -137,7 +137,7 @@ module checkpoint_reporter
 
         file = filename
 
-        open(unit=unit, file=file, action='write')
+        open(unit=unit, file=file)
         config_index = 0
 
     end subroutine open_checkpoint_file
@@ -147,18 +147,23 @@ module checkpoint_reporter
         integer, intent(in) :: unit
         integer :: I
 
-        write(unit, *) N
-        write(unit, *) 
-        write(unit, *) box_length(1), box_length(2), box_length(3)
+        write(unit, "('ATOMS ', I0)") N
+        write(unit, *)
+        write(unit, "('BONDS ', I0)") NC
+        write(unit, *)
+        write(unit, "('BOX ', 3F10.5)") box_length(1), box_length(2), box_length(3)
+        write(unit, *)
+        write(unit, "('ATOM: ID TYPE SHAPEX SHAPEY SHAPEZ ESHAPEX ESHAPEY ESHAPEZ RX RY RZ VX VY VZ LX LY LZ QW QX QY QZ')")
         write(unit, *)
         do I = 1, N
-            write(unit, "(1x, I5, 50f20.10)") rtype(I), exc_rad(I), &
-                                          shape_x(I), shape_y(I), shape_z(I), eshape_x(I), eshape_y(I), eshape_z(I), &
+            write(unit, "(1x, 2I10, 50F20.10)") I, rtype(I), shape_x(I), shape_y(I), shape_z(I), eshape_x(I), eshape_y(I), eshape_z(I), &
                                           RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I), LX(I), LY(I), LZ(I), QW(I), QX(I), QY(I), QZ(I)
         enddo
         write(unit, *)
+        write(unit, "('BOND: ID I J LEN')")
+        write(unit, *)
         do I = 1, NC
-            write(unit, "(1x, 2I10, f20.10)") BBI(I), BBJ(I), BB_len(I)
+            write(unit, "(1x, 3I10, 50F20.10)") I, BBI(I), BBJ(I), BB_len(I)
         enddo
         write(unit, *)
         write(unit, *) config_index
@@ -168,23 +173,38 @@ module checkpoint_reporter
     subroutine load_checkpoint( unit )
         implicit none
         integer, intent(in) :: unit
-        integer :: I
+        integer :: I, J, na, nb, ia, ja
+        real(8) :: la, bx, by, bz
+        character(len=256) :: label
 
-        read(unit, *) N
+        read(unit, *) label, na
+        call set_num_atoms(na)
         read(unit, *)
-        read(unit, *) box_length(1), box_length(2), box_length(3)
+        read(unit, *) label, nb
+        call set_num_constraints(nb)
+        read(unit, *)
+        read(unit, *) label, bx, by, bz
+        call set_box( bx, by, bz )
+        read(unit, *)
+        read(unit, *) label
         read(unit, *)
         do I = 1, N
-            read(unit, "(1x, I5, 50f20.10)") rtype(I), exc_rad(I), &
-                                          shape_x(I), shape_y(I), shape_z(I), eshape_x(I), eshape_y(I), eshape_z(I), &                  
+            read(unit, *) J, rtype(I), shape_x(I), shape_y(I), shape_z(I), eshape_x(I), eshape_y(I), eshape_z(I), &                  
                                           RX(I), RY(I), RZ(I), VX(I), VY(I), VZ(I), LX(I), LY(I), LZ(I), QW(I), QX(I), QY(I), QZ(I)
         enddo
         read(unit, *)
+        read(unit, *) label
+        read(unit, *)
         do I = 1, NC
-            read(unit, "(1x, 2I10, f20.10)") BBI(I), BBJ(I), BB_len(I)
+            read(unit, *) J, ia, ja, la
+            call add_constraint(J, ia, ja, la)
         enddo
         read(unit, *)
         read(unit, *) config_index
+
+        default_shape_set = .FALSE.
+        default_energy_set = .FALSE.
+        box_lengths_set = .TRUE.
         
     end subroutine load_checkpoint
 
@@ -202,4 +222,5 @@ module reporters
     use state_data_reporter
     use trajectory_reporter
     use config_reporter
+    use checkpoint_reporter
 end module reporters

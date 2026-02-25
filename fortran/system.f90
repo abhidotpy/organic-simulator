@@ -1,9 +1,6 @@
 module atom
     implicit none
 
-    ! real(8) :: mass, charge
-    ! real(8), dimension(3) :: rad, erad, exc_rad, MOI
-
     real(8), allocatable, dimension(:) :: mass, charge
     real(8), allocatable, dimension(:) :: shape_x, shape_y, shape_z, exc_rad
     real(8), allocatable, dimension(:) :: eshape_x, eshape_y, eshape_z
@@ -49,7 +46,6 @@ module system
     logical :: default_charge_set   = .TRUE.
     logical :: default_shape_set    = .TRUE.
     logical :: default_energy_set   = .TRUE.
-    logical :: rotations_set        = .FALSE.
     logical :: box_lengths_set      = .FALSE.
     logical :: num_atoms_set        = .FALSE.
     logical :: density_set          = .FALSE.
@@ -102,10 +98,20 @@ module system
         NC = num_constraints
         dof = dof - NC
 
+        allocate( RX_old(N), RY_old(N), RZ_old(N) )
         allocate( BBI(NC), BBJ(NC), BB_len(NC) )
         BBI = 0; BBJ = 0; BB_len = 0.0
+        RX_old = 0.0; RY_old = 0.0; RZ_old = 0.0
 
     end subroutine set_num_constraints
+
+    subroutine set_density( dens )
+        implicit none
+        real(8), intent(in) :: dens
+
+        density_set = .TRUE.
+        density = dens
+    end subroutine set_density
 
     subroutine set_atom_type( id, atom_type )
         implicit none
@@ -116,8 +122,8 @@ module system
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
             stop
         else if ( id < 1 .or. id > N ) then
-            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
-            in system of ',I10,' atoms.')") id, N
+            write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
+            in system of ',I0,' atoms.')") id, N
         else
             rtype(id) = atom_type
         endif
@@ -133,8 +139,8 @@ module system
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
             stop
         else if ( id < 1 .or. id > N ) then
-            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
-            in system of ',I10,' atoms.')") id, N
+            write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
+            in system of ',I0,' atoms.')") id, N
         else
             default_mass_set = .FALSE.
             mass(id) = atom_mass
@@ -151,8 +157,8 @@ module system
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
             stop
         else if ( id < 1 .or. id > N ) then
-            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
-            in system of ',I10,' atoms.')") id, N
+            write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
+            in system of ',I0,' atoms.')") id, N
         else
             default_charge_set = .FALSE.
             charge(id) = atom_charge
@@ -214,8 +220,8 @@ module system
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
             stop
         else if ( id < 1 .or. id > N ) then
-            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
-            in system of ',I10,' atoms.')") id, N
+            write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
+            in system of ',I0,' atoms.')") id, N
         else
             default_shape_set = .FALSE.
 
@@ -242,8 +248,8 @@ module system
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
             stop
         else if ( id < 1 .or. id > N ) then
-            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
-            in system of ',I10,' atoms.')") id, N
+            write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
+            in system of ',I0,' atoms.')") id, N
         else
             default_energy_set = .FALSE.
 
@@ -264,8 +270,8 @@ module system
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
             stop
         else if ( id < 1 .or. id > N ) then
-            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
-            in system of ',I10,' atoms.')") id, N
+            write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
+            in system of ',I0,' atoms.')") id, N
         else
             RX(id) = pos_x
             RY(id) = pos_y
@@ -284,8 +290,8 @@ module system
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
             stop
         else if ( id < 1 .or. id > N ) then
-            write(*, "(1x, 'Error: Atom index ', I10,' does not exist &
-            in system of ',I10,' atoms.')") id, N
+            write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
+            in system of ',I0,' atoms.')") id, N
         else
             VX(id) = vel_x
             VY(id) = vel_y
@@ -304,8 +310,8 @@ module system
             write(*, "(1x, 'Error: System has no constraints. Set number of constraints first.')")
             stop
         else if ( id < 1 .or. id > NC ) then
-            write(*, "(1x, 'Error: Constraint index ', I10,' does not exist &
-            in system of ',I10,' constraints.')") id, N
+            write(*, "(1x, 'Error: Constraint index ', I0,' does not exist &
+            in system of ',I0,' constraints.')") id, NC
         else
             BBI(id) = I
             BBJ(id) = J
@@ -457,50 +463,56 @@ module system
 
     end subroutine generate_fcc_lattice
 
-    subroutine initialize_system( )
+    subroutine initialize_system( m )
         implicit none
+        logical, optional :: m
+        logical :: message
 
-        write(*, *)
-        write(*, "(1x, 'This is SUCROSE v1.0')")
+        if (not(present(m))) then
+            message = .TRUE.
+        endif
+
+        if(message) write(*, *)
+        if(message) write(*, "(1x, 'This is SUCROSE v1.0')")
 
         if (num_atoms_set) then
-            write(*, "(1x, 'Number of particles in system set to ', i10)") N
+            if(message) write(*, "(1x, 'Number of particles in system set to ', I0)") N
         else
-            write(*, "(1x, 'Error: Number of particles not set. Set number of &
+            if(message) write(*, "(1x, 'Error: Number of particles not set. Set number of &
             particles before initializing system.')")
             stop
         endif
 
         if (box_lengths_set) then
-            write(*, "(1x, 'Box dimensions set to ', 3f10.5)") box_length
+            if(message) write(*, "(1x, 'Box dimensions set to ', F0.2, 3X, F0.2, 3X, F0.2)") box_length
 
             if (density_set) then
-                write(*, "(1x, 'Density of system set to ', f10.5)") density
+                if(message) write(*, "(1x, 'Density of system set to ', F0.5)") density
             else
-                density = real(N) / volume
+                density = dble(N) / volume
                 density_set = .TRUE.
-                write(*, "(1x, 'Density of system set to ', f10.5)") density
+                if(message) write(*, "(1x, 'Density of system set to ', F0.5)") density
             endif
 
         else
-            write(*, "(1x, 'Error: Box dimensions not set. Set box dimensions &
+            if(message) write(*, "(1x, 'Error: Box dimensions not set. Set box dimensions &
             before initializing system.')")
             stop
         endif
             
         if (is_periodic) then
-            write(*, "(1x, 'Periodic boundary conditions enabled for current system')")
+            if(message) write(*, "(1x, 'Periodic boundary conditions enabled for current system')")
         else
-            write(*, "(1x, 'Periodic boundary conditions disabled for current system')")
+            if(message) write(*, "(1x, 'Periodic boundary conditions disabled for current system')")
         endif
 
         if (default_mass_set) then
             mass = 1.0
-            write(*, "(1x, 'Default mass for atoms set to ', f10.5)") mass(1)
+            if(message) write(*, "(1x, 'Default mass for atoms set to ', G0.2)") mass(1)
         endif
         if (default_charge_set) then
             charge = 0.0
-            write(*, "(1x, 'Default charge for atoms set to ', f10.5)") charge(1)
+            if(message) write(*, "(1x, 'Default charge for atoms set to ', G0.2)") charge(1)
         endif
         if (default_shape_set) then
             shape_x = 1.0; shape_y = 1.0; shape_z = 1.0
@@ -510,26 +522,26 @@ module system
             Izz = ( shape_x(1) ** 2.0 + shape_y(1) ** 2.0 ) / 20.0
 
             exc_rad = 1.0
-            write(*, "(1x, 'Default shape for atoms set to ', f10.5)") shape_x(1)
+            if(message) write(*, "(1x, 'Default shape for atoms set to ', G0.2)") shape_x(1)
         endif
         if (default_energy_set) then
             eshape_x = 1.0; eshape_y = 1.0; eshape_z = 1.0
-            write(*, "(1x, 'Default energy for atoms set to ', f10.5)") eshape_x(1)
+            if(message) write(*, "(1x, 'Default energy for atoms set to ', G0.2)") eshape_x(1)
         endif
 
         if (fcc_lattice_set) then
-            write(*, "(1x, 'FCC lattice generated with ', i10, ' particles')") N
+            if(message) write(*, "(1x, 'FCC lattice generated with ', I0, ' particles')") N
         endif
 
         Ixx = Ixx * mass
         Iyy = Iyy * mass
         Izz = Izz * mass
         
-        write(*, "(1x, 'System initialization complete.')")
+        if(message) write(*, "(1x, 'System initialization complete.')")
 
         call initialize_forces
 
-        write(*, *)
+        if(message) write(*, *)
 
     end subroutine initialize_system
 
@@ -546,6 +558,8 @@ module system
         if (volume > 0.0) then
             pressure = (density * temperature) + (virial / (3.0 * volume) )
         endif
+
+        density = dble(N) / volume
 
         potential_energy = potential_energy / dble(N)
         kinetic_energy = kinetic_energy / dble(N)
