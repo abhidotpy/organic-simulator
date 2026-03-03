@@ -102,20 +102,10 @@ module xmath
     real, parameter :: pi = 3.1415926535897932384626433832795
     real, parameter :: e = 2.7182818284590452353602874713527
 
-    type, public :: Quaternion
-        real(8), dimension(4) :: q
-    end type
-
     interface operator(.x.)
         module procedure vmdot
         module procedure mvdot
         module procedure mmdot
-        module procedure quat_vec_product
-    end interface
-
-    interface operator(*)
-        module procedure quat_product
-        module procedure scalar_quat_product
     end interface
 
     contains
@@ -127,7 +117,7 @@ module xmath
 
         out = sqrt(sum(v**2))
 
-    end function
+    end function mag
 
     pure function mag2(v) result (out)
         implicit none
@@ -136,7 +126,7 @@ module xmath
 
         out = sum(v**2)
 
-    end function
+    end function mag2
 
     pure function normalize(v) result (out)
         implicit none
@@ -201,50 +191,38 @@ module xmath
 
     end function inverse
 
-    pure function quat_conjugate(quat) result (out)
+    pure function as_matrix( w, x, y, z ) result (out)
         implicit none
-        type(Quaternion), intent(in) :: quat
-        type(Quaternion) :: out
-
-        out % q(1) =  quat % q(1)
-        out % q(2) = -quat % q(2)
-        out % q(3) = -quat % q(3)
-        out % q(4) = -quat % q(4)
-
-    end function quat_conjugate
-
-    pure function as_matrix(quat) result (out)
-        implicit none
-        type(Quaternion), intent(in) :: quat
+        real(8), intent(in)     :: w, x, y, z
         real(8), dimension(3,3) :: out
 
-        out(1, 1) = 1 - 2 * quat % q(3)**2 - 2 * quat % q(4)**2
-        out(1, 2) = 2 * quat % q(2) * quat % q(3) - 2 * quat % q(1) * quat % q(4)
-        out(1, 3) = 2 * quat % q(1) * quat % q(3) + 2 * quat % q(2) * quat % q(4)
+        out(1, 1) = 1 - 2 * y ** 2 - 2 * z ** 2
+        out(1, 2) = 2 * x * y - 2 * w * z
+        out(1, 3) = 2 * w * y + 2 * x * z
 
-        out(2, 1) = 2 * quat % q(2) * quat % q(3) + 2 * quat % q(1) * quat % q(4)
-        out(2, 2) = 1 - 2 * quat % q(2)**2 - 2 * quat % q(4)**2
-        out(2, 3) = 2 * quat % q(3) * quat % q(4) - 2 * quat % q(1) * quat % q(2)
+        out(2, 1) = 2 * x * y + 2 * w * z
+        out(2, 2) = 1 - 2 * x ** 2 - 2 * z ** 2
+        out(2, 3) = 2 * y * z - 2 * w * x
 
-        out(3, 1) = 2 * quat % q(1) * quat % q(4) - 2 * quat % q(2) * quat % q(3)
-        out(3, 2) = 2 * quat % q(3) * quat % q(4) + 2 * quat % q(1) * quat % q(2)
-        out(3, 3) = 1 - 2 * quat % q(2)**2 - 2 * quat % q(3)**2
+        out(3, 1) = 2 * w * z - 2 * x * y
+        out(3, 2) = 2 * y * z + 2 * w * x
+        out(3, 3) = 1 - 2 * x ** 2 - 2 * y ** 2
 
     end function as_matrix
 
-    pure function rotation_matrix(quat) result (rot_matrix)
-        real, dimension(4), intent(in) :: quat
+    pure function rotation_matrix( w, x, y, z ) result (rot_matrix)
+        real(8), intent(in)   :: w, x, y, z
         real, dimension(3, 3) :: rot_matrix
 
-        rot_matrix(1, 1) = quat(1) ** 2 + quat(2) ** 2 - quat(3) ** 2 - quat(4) ** 2
-        rot_matrix(1, 2) = 2.0 * ( quat(2) * quat(3) + quat(1) * quat(4) )
-        rot_matrix(1, 3) = 2.0 * ( quat(2) * quat(4) - quat(1) * quat(3) )
-        rot_matrix(2, 1) = 2.0 * ( quat(2) * quat(3) - quat(1) * quat(4) )
-        rot_matrix(2, 2) = quat(1) ** 2 - quat(2) ** 2 + quat(3) ** 2 - quat(4) ** 2
-        rot_matrix(2, 3) = 2.0 * ( quat(3) * quat(4) + quat(1) * quat(2) )
-        rot_matrix(3, 1) = 2.0 * ( quat(2) * quat(4) + quat(1) * quat(3) )
-        rot_matrix(3, 2) = 2.0 * ( quat(3) * quat(4) - quat(1) * quat(2) )
-        rot_matrix(3, 3) = quat(1) ** 2 - quat(2) ** 2 - quat(3) ** 2 + quat(4) ** 2
+        rot_matrix(1, 1) = w ** 2 + x ** 2 - y ** 2 - z ** 2
+        rot_matrix(1, 2) = 2.0 * ( x * y + w * z )
+        rot_matrix(1, 3) = 2.0 * ( x * z - w * y )
+        rot_matrix(2, 1) = 2.0 * ( x * y - w * z )
+        rot_matrix(2, 2) = w ** 2 - x ** 2 + y ** 2 - z ** 2
+        rot_matrix(2, 3) = 2.0 * ( y * z + w * x )
+        rot_matrix(3, 1) = 2.0 * ( x * z + w * y )
+        rot_matrix(3, 2) = 2.0 * ( y * z - w * x )
+        rot_matrix(3, 3) = w ** 2 - x ** 2 - y ** 2 + z ** 2
 
     end function rotation_matrix
 
@@ -255,7 +233,7 @@ module xmath
 
         out = sum(a * b)
 
-    end function
+    end function vvdot
 
     pure function vmdot(a, b) result (out)
         implicit none
@@ -299,43 +277,17 @@ module xmath
 
     end function mmdot
 
-    pure function quat_product(a, b) result (out)
+    pure function quat_product(q1, q2) result (out)
         implicit none
-        type(Quaternion), intent(in) :: a, b
-        type(Quaternion) :: out
+        real(8), dimension(4), intent(in) :: q1, q2
+        real(8), dimension(4)             :: out
 
-        out % q(1) = a % q(1) * b % q(1) - a % q(2) * b % q(2) - a % q(3) * b % q(3) - a % q(4) * b % q(4)
-        out % q(2) = a % q(1) * b % q(2) + a % q(2) * b % q(1) + a % q(3) * b % q(4) - a % q(4) * b % q(3)
-        out % q(3) = a % q(1) * b % q(3) - a % q(2) * b % q(4) + a % q(3) * b % q(1) + a % q(4) * b % q(2)
-        out % q(4) = a % q(1) * b % q(4) + a % q(2) * b % q(3) - a % q(3) * b % q(2) + a % q(4) * b % q(1)
+        out(1) = q1(1) * q2(1) - q1(2) * q2(2) - q1(3) * q2(3) - q1(4) * q2(4)
+        out(2) = q1(1) * q2(2) + q1(2) * q2(1) + q1(3) * q2(4) - q1(4) * q2(3)
+        out(3) = q1(1) * q2(3) - q1(2) * q2(4) + q1(3) * q2(1) + q1(4) * q2(2)
+        out(4) = q1(1) * q2(4) + q1(2) * q2(3) - q1(3) * q2(2) + q1(4) * q2(1)
 
     end function quat_product
-
-    pure function quat_vec_product(a, b) result (out)
-        implicit none
-        type(Quaternion), intent(in) :: a
-        real(8), dimension(3), intent(in) :: b
-        type(Quaternion) :: out
-
-        out % q(1) = - a % q(2) * b(1) - a % q(3) * b(2) - a % q(4) * b(3)
-        out % q(2) =   a % q(1) * b(1) + a % q(3) * b(3) - a % q(4) * b(2)
-        out % q(3) =   a % q(1) * b(2) - a % q(2) * b(3) + a % q(4) * b(1)
-        out % q(4) =   a % q(1) * b(3) + a % q(2) * b(2) - a % q(3) * b(1)
-
-    end function quat_vec_product
-
-    pure function scalar_quat_product(scalar, quat) result (out)
-        implicit none
-        real(8), intent(in) :: scalar
-        type(Quaternion), intent(in) :: quat
-        type(Quaternion) :: out
-
-        out % q(1) = scalar * quat % q(1)
-        out % q(2) = scalar * quat % q(2)
-        out % q(3) = scalar * quat % q(3)
-        out % q(4) = scalar * quat % q(4)
-
-    end function scalar_quat_product
 
     pure function degrees_to_radians(angle) result (out)
         implicit none

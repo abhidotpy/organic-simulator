@@ -2,16 +2,15 @@ module lennard_jones
     use system
     implicit none
 
-    real(8) :: epsilon = 1.0
-    real(8) :: sigma = 1.0
-
     contains
-    subroutine lj_calculate_forces( I, J, cutoff, eng )
+    pure subroutine lj_calculate_forces( I, J, cutoff, PE, FXIJ, eng)
         implicit none
         integer, intent(in)           :: I, J
-        real(8), optional, intent(in) :: eng
         real(8), intent(in)           :: cutoff
-        real(8), dimension(3)         :: RIJ, FIJ
+        real(8), intent(out)          :: PE, FXIJ(3)
+        real(8), optional, intent(in) :: eng
+
+        real(8)                       :: RIJ(3), epsilon, sigma
         real(8)                       :: rij_sq, rcut_sq, sr2_lj, coeff
         real(8)                       :: pot, pot_cut, sr2_cut
 
@@ -41,16 +40,12 @@ module lennard_jones
             pot_cut = 4.0 * epsilon * ( sr2_cut**6 - sr2_cut**3 )
             coeff = 24.0 * epsilon * (2.0 * sr2_lj**6 - sr2_lj**3)
 
-            potential_energy = potential_energy + pot - pot_cut
-            FIJ = coeff * RIJ / rij_sq
-
-            FX(I) = FX(I) + FIJ(1)
-            FY(I) = FY(I) + FIJ(2)
-            FZ(I) = FZ(I) + FIJ(3)
-
-            FX(J) = FX(J) - FIJ(1)
-            FY(J) = FY(J) - FIJ(2)
-            FZ(J) = FZ(J) - FIJ(3)
+            PE = pot - pot_cut
+            FXIJ = coeff * RIJ / rij_sq
+        
+        else
+            PE = 0.0
+            FXIJ = 0.0
         endif
 
     end subroutine lj_calculate_forces
@@ -61,16 +56,15 @@ module lennard_jones12
     use system
     implicit none
 
-    real(8) :: epsilon = 1.0
-    real(8) :: sigma = 1.0
-
     contains
-    subroutine lj12_calculate_forces( I, J, cutoff, eng )
+    pure subroutine lj12_calculate_forces( I, J, cutoff, PE, FXIJ, eng )
         implicit none
         integer, intent(in)           :: I, J
-        real(8), optional, intent(in) :: eng 
         real(8), intent(in)           :: cutoff
-        real(8), dimension(3)         :: RIJ, FIJ
+        real(8), intent(out)          :: PE, FXIJ(3)
+        real(8), optional, intent(in) :: eng
+
+        real(8)                       :: RIJ(3), epsilon, sigma
         real(8)                       :: rij_sq, rcut_sq, sr2_lj, coeff
         real(8)                       :: pot, pot_cut, sr2_cut
 
@@ -101,16 +95,12 @@ module lennard_jones12
             pot_cut = epsilon * ( sr2_cut**6.0 - 2.0*sr2_cut**3.0 )
             coeff = 12.0 * epsilon * (sr2_lj**6 - sr2_lj**3)
 
-            potential_energy = potential_energy + pot - pot_cut
-            FIJ = coeff * RIJ / rij_sq
+            PE = pot - pot_cut
+            FXIJ = coeff * RIJ / rij_sq
 
-            FX(I) = FX(I) + FIJ(1)
-            FY(I) = FY(I) + FIJ(2)
-            FZ(I) = FZ(I) + FIJ(3)
-
-            FX(J) = FX(J) - FIJ(1)
-            FY(J) = FY(J) - FIJ(2)
-            FZ(J) = FZ(J) - FIJ(3)
+        else
+            PE = 0.0
+            FXIJ = 0.0
         endif
 
     end subroutine lj12_calculate_forces
@@ -121,13 +111,11 @@ module wca
     use system
     implicit none
 
-    real(8) :: epsilon = 1.0
-    real(8) :: sigma = 1.0
-
     contains
-    subroutine wca_calculate_forces( I, J )
+    pure subroutine wca_calculate_forces( I, J, PE, FXIJ )
         implicit none
         integer, intent(in)           :: I, J
+        real(8), intent(out)          :: PE, FXIJ(3)
         real(8), dimension(3)         :: RIJ, FIJ
         real(8)                       :: rij_sq, sigma_sq, sr2_lj
         real(8)                       :: coeff, pot
@@ -146,19 +134,12 @@ module wca
         sr2_lj = sigma_sq / rij_sq
 
         if ( rij_sq <= sigma_sq ) then
-            pot = epsilon * ( sr2_lj**6.0 - 2.0*sr2_lj**3.0 )
-            coeff = 12.0 * epsilon * (sr2_lj**6 - sr2_lj**3)
-            
-            potential_energy = potential_energy + pot
-            FIJ = coeff * RIJ / rij_sq
-
-            FX(I) = FX(I) + FIJ(1)
-            FY(I) = FY(I) + FIJ(2)
-            FZ(I) = FZ(I) + FIJ(3)
-            
-            FX(J) = FX(J) - FIJ(1)
-            FY(J) = FY(J) - FIJ(2)
-            FZ(J) = FZ(J) - FIJ(3)
+            PE = ( sr2_lj**6.0 - 2.0*sr2_lj**3.0 )
+            coeff = 12.0 * (sr2_lj**6 - sr2_lj**3)
+            FXIJ = coeff * RIJ / rij_sq
+        else
+            PE = 0.0
+            FXIJ = 0.0
         endif
 
     end subroutine wca_calculate_forces
@@ -170,11 +151,12 @@ module morse
     implicit none
 
     contains
-    subroutine morse_calculate_forces( I, J, dissoc, width, rmin, cutoff )
+    pure subroutine morse_calculate_forces( I, J, dissoc, width, rmin, cutoff, PE, FXIJ )
         implicit none
         integer, intent(in)   :: I, J
         real(8), dimension(3) :: RIJ, FIJ
         real(8), intent(in)   :: dissoc, width, rmin, cutoff
+        real(8), intent(out)  :: PE, FXIJ(3)
         real(8)               :: rij_mag, exp_term
         real(8)               :: exp_cut, pot, pot_cut
 
@@ -195,16 +177,12 @@ module morse
             pot = dissoc * ( (1.0 - exp_term)**2.0 - 1.0 )
             pot_cut = dissoc * ( (1.0 - exp_cut)**2.0 - 1.0 )
 
-            potential_energy = potential_energy + pot - pot_cut
-            FIJ = -2.0 * width * dissoc * (1.0 - exp_term) * exp_term * RIJ / rij_mag
+            PE = pot - pot_cut
+            FXIJ = -2.0 * width * dissoc * (1.0 - exp_term) * exp_term * RIJ / rij_mag
 
-            FX(I) = FX(I) + FIJ(1)
-            FY(I) = FY(I) + FIJ(2)
-            FZ(I) = FZ(I) + FIJ(3)
-
-            FX(J) = FX(J) - FIJ(1)
-            FY(J) = FY(J) - FIJ(2)
-            FZ(J) = FZ(J) - FIJ(3)
+        else
+            PE = 0.0
+            FXIJ = 0.0
         endif
 
     end subroutine morse_calculate_forces
@@ -215,75 +193,93 @@ module gay_berne
     use system
     implicit none
     
-    real(8), dimension(3), public :: U1, U2, RIJ, RIJ_cut
-    real(8), dimension(3), public :: FIJ, TI, TJ, TORQ1, TORQ2
-    public :: gb_calculate_forces
+    type :: gb_parameters
+        real(8) :: ru1, ru2, uu, chi, xhi
+    end type
     
-    private
-    real(8) :: meu = 1.0, neu = 2.0
-    real(8) :: ru1, ru2, uu, chi, xhi, rij_sq, rij_mag
-    real(8) :: eps1, eps2, sr, sigma, sigma_0 = 1.0
-    real(8) :: sr_cut
-
+    type :: gb_pair
+        real(8), dimension(3)   :: U1, U2, RIJ
+        real(8)                 :: rij_sq, rij_mag
+    end type
 
     contains
-    function g_func( chie ) result (res)
+    pure function g_func( chie, param, pair ) result (res)
         implicit none
-        real(8), intent(in) :: chie
-        real(8)             :: term1, term2, res
+        real(8), intent(in)             :: chie
+        type(gb_parameters), intent(in) :: param
+        type(gb_pair), intent(in)       :: pair
+        real(8)                         :: term1, term2, res
 
-        term1 = (ru1 + ru2)**2 / (1 + chie * uu)
-        term2 = (ru1 - ru2)**2 / (1 - chie * uu)
+        term1 = (param % ru1 + param % ru2)**2 / (1 + chie * param % uu)
+        term2 = (param % ru1 - param % ru2)**2 / (1 - chie * param % uu)
         
-        res = 1 - (chie / 2.0 / rij_sq) * (term1 + term2)
+        res = 1 - (chie / 2.0 / pair % rij_sq) * (term1 + term2)
 
     end function g_func
 
-    function dG_dr( chie ) result (res)
+    pure function dG_dr( chie, param, pair ) result (res)
         implicit none
-        real(8), intent(in)     :: chie
-        real(8), dimension(3)   :: term1, term2, res
+        real(8), intent(in)             :: chie
+        type(gb_parameters), intent(in) :: param
+        type(gb_pair), intent(in)       :: pair
+        real(8), dimension(3)           :: term1, term2, res
 
-        term1 = ((ru1 + ru2) / (1 + chie * uu)) * (U1 + U2)
-        term2 = ((ru1 - ru2) / (1 - chie * uu)) * (U1 - U2)
+        term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu)) * (pair % U1 + pair % U2)
+        term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu)) * (pair % U1 - pair % U2)
         
-        res = (-chie / RIJ_SQ ) * (term1 + term2) + (2 * RIJ / RIJ_SQ) * (1 - g_func( chie ))
+        res = (-chie / pair % RIJ_SQ ) * (term1 + term2) + (2 * pair % RIJ / pair % RIJ_SQ) * (1 - g_func( chie, param, pair ))
 
     end function dG_dr
 
-    function dG_du1( chie ) result(res)
+    pure function dG_du1( chie, param, pair ) result(res)
         implicit none
-        real(8), intent(in)    :: chie
-        real(8)                :: term1, term2, res(3)
+        real(8), intent(in)             :: chie
+        type(gb_parameters), intent(in) :: param
+        type(gb_pair), intent(in)       :: pair
+        real(8)                         :: term1, term2, res(3)
         
-        term1 = ((ru1 + ru2) / (1 + chie * uu))
-        term2 = ((ru1 - ru2) / (1 - chie * uu))
+        term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu))
+        term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu))
         
-        res = (-chie * RIJ / rij_sq ) * (term1 + term2) + ((chie**2 * U2) / (2 * rij_sq)) * (term1 ** 2 - term2 ** 2)
+        res = (-chie * pair % RIJ / pair % rij_sq ) * (term1 + term2) + ((chie**2 * pair % U2) / (2 * pair % rij_sq)) * (term1 ** 2 - term2 ** 2)
         
     end function dG_du1
 
-    function dG_du2( chie ) result(res)
+    pure function dG_du2( chie, param, pair ) result(res)
         implicit none
-        real(8), intent(in)    :: chie
-        real(8)                :: term1, term2, res(3)
+        real(8), intent(in)             :: chie
+        type(gb_parameters), intent(in) :: param
+        type(gb_pair), intent(in)       :: pair
+        real(8)                         :: term1, term2, res(3)
         
-        term1 = ((ru1 + ru2) / (1 + chie * uu))
-        term2 = ((ru1 - ru2) / (1 - chie * uu))
+        term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu))
+        term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu))
         
-        res = (-chie * RIJ / RIJ_SQ ) * (term1 - term2) + ((chie**2 * U1) / (2 * rij_sq)) * (term1 ** 2 - term2 ** 2)
+        res = (-chie * pair % RIJ / pair % RIJ_SQ ) * (term1 - term2) + ((chie**2 * pair % U1) / (2 * pair % rij_sq)) * (term1 ** 2 - term2 ** 2)
         
     end function dG_du2
 
-    subroutine gb_calculate_forces( I, J, cutoff, width )
+    pure subroutine gb_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width )
         implicit none
         integer, intent(in)             :: I, J
-        real(8), optional               :: width
+        real(8), intent(in)             :: cutoff
+        real(8), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
+        real(8), optional, intent(in)   :: width
+        
+        type(gb_parameters) :: param
+        type(gb_pair)       :: pair
+        
         real(8), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2
         real(8), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
-        real(8)                         :: pot, cutoff, wf
+        real(8), dimension(3)           :: FIJ, TI, TJ, TORQ1, TORQ2
+
+        real(8)                         :: meu, neu
+        real(8)                         :: eps1, eps2, sr, sr_cut, sigma, sigma_0
+        real(8)                         :: pot, wf, srx_fac, srd_fac
         real(8)                         :: switch, xx, sx, sdx, factor
-        logical                         :: imp_wat = .FALSE.
+        logical                         :: imp_wat
+
+        meu = 1.0; neu = 2.0; sigma_0 = 1.0; imp_wat = .FALSE.
 
         if (present(width)) then
             wf = width
@@ -293,76 +289,79 @@ module gay_berne
             imp_wat = .FALSE.
         endif
 
-        RIJ(1) = RX(I) - RX(J)
-        RIJ(2) = RY(I) - RY(J)
-        RIJ(3) = RZ(I) - RZ(J)
+        pair % RIJ(1) = RX(I) - RX(J)
+        pair % RIJ(2) = RY(I) - RY(J)
+        pair % RIJ(3) = RZ(I) - RZ(J)
 
         if (is_periodic) then
-            RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
+            pair % RIJ = pair % RIJ - ANINT( pair % RIJ / box_length ) * box_length
         endif
 
-        RIJ_SQ = SUM( RIJ**2 )
-        RIJ_MAG = SQRT( RIJ_SQ )
+        pair % RIJ_SQ = SUM( pair % RIJ**2 )
+        pair % RIJ_MAG = SQRT( pair % RIJ_SQ )
 
-        U1(1) = 2.0 *  ( QX(I) * QZ(I) + QW(I) * QY(I) )
-        U1(2) = 2.0 *  ( QY(I) * QZ(I) - QW(I) * QX(I) )
-        U1(3) = QW(I)**2 - QX(I)**2 - QY(I)**2 + QZ(I)**2
+        pair % U1(1) = 2.0 *  ( QX(I) * QZ(I) + QW(I) * QY(I) )
+        pair % U1(2) = 2.0 *  ( QY(I) * QZ(I) - QW(I) * QX(I) )
+        pair % U1(3) = QW(I)**2 - QX(I)**2 - QY(I)**2 + QZ(I)**2
 
-        U2(1) = 2.0 *  ( QX(J) * QZ(J) + QW(J) * QY(J) )
-        U2(2) = 2.0 *  ( QY(J) * QZ(J) - QW(J) * QX(J) )
-        U2(3) = QW(J)**2 - QX(J)**2 - QY(J)**2 + QZ(J)**2
+        pair % U2(1) = 2.0 *  ( QX(J) * QZ(J) + QW(J) * QY(J) )
+        pair % U2(2) = 2.0 *  ( QY(J) * QZ(J) - QW(J) * QX(J) )
+        pair % U2(3) = QW(J)**2 - QX(J)**2 - QY(J)**2 + QZ(J)**2
 
         ! CALCULATE GAY BERNE PARAMETERS
 
-        ru1 = dot( RIJ, U1 )
-        ru2 = dot( RIJ, U2 )
-        uu  = dot( U1, U2 )
-        chi = ( shape_z(I) ** 2 - shape_x(I) ** 2 ) / ( shape_z(I) ** 2 + shape_x(I) ** 2 )
-        xhi = ( eshape_x(I) ** (1.0/meu) - eshape_z(I) ** (1.0/meu) ) / ( eshape_x(I) ** (1.0/meu) + eshape_z(I) ** (1.0/meu) )
+        param % ru1 = dot( pair % RIJ, pair % U1 )
+        param % ru2 = dot( pair % RIJ, pair % U2 )
+        param % uu  = dot( pair % U1, pair % U2 )
+        param % chi = ( shape_z(I) ** 2 - shape_x(I) ** 2 ) / ( shape_z(I) ** 2 + shape_x(I) ** 2 )
+        param % xhi = ( eshape_x(I) ** (1.0/meu) - eshape_z(I) ** (1.0/meu) ) / ( eshape_x(I) ** (1.0/meu) + eshape_z(I) ** (1.0/meu) )
 
-        eps1 = ( 1 - ( chi * uu ) ** 2) ** (-1.0 / 2.0)
-        eps2 = g_func( xhi )
-        sigma = shape_x(I) * g_func( chi ) ** (-1.0 / 2.0)
+        eps1 = ( 1 - ( param % chi * param % uu ) ** 2) ** (-1.0 / 2.0)
+        eps2 = g_func( param % xhi, param, pair )
+        sigma = shape_x(I) * g_func( param % chi, param, pair ) ** (-1.0 / 2.0)
 
         switch = ( cutoff + wf ) - 2.0 * sigma_0    ! Apply switch function 2sigma_0 inside cutoff
         factor = 1.0 / ( ( cutoff + wf ) - switch )
-        xx = ( RIJ_MAG - switch ) * factor
+        xx = ( pair % RIJ_MAG - switch ) * factor
         sx = 1.0 - 6.0 * xx ** 5.0 + 15.0 * xx ** 4.0 - 10.0 * xx ** 3.0
         sdx = -30.0 * xx ** 4.0 + 60.0 * xx ** 3.0 - 30.0 * xx ** 2.0
 
-        if ( rij_mag < ( sigma + cutoff + wf ) ) then
+        if ( pair % RIJ_MAG < ( sigma + cutoff + wf ) ) then
 
             if (imp_wat) then
-                if ( rij_mag < sigma ) then
-                    sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
-                else if ((rij_mag .ge. sigma) .and. (rij_mag .le. (sigma + wf))) then
+                if ( pair % RIJ_MAG < sigma ) then
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+                else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
                     sr = sigma_0 / ( sigma - sigma + sigma_0 )
                 else
-                    sr = sigma_0 / ( rij_mag - sigma + sigma_0 - wf )
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
                 endif
             else
-                sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
+                sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
             endif
 
-            dR_dr   = (1.0 / sigma_0) * (( RIJ / rij_mag ) + 0.5 * shape_x(I) * dG_dr( chi ) * g_func( chi ) ** (-3.0 / 2.0))
-            de2_dr  = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_dr( xhi )
+            srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
+            srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
 
-            de1_du1 = (eps2 ** meu) * neu * eps1 ** (neu + 2) * (chi ** 2 * uu * U2)
-            de2_du1 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * dG_du1( xhi )
-            dR_du1  = (12.0 * sr**7 - 12.0 * sr**13) * 0.5 * (shape_x(I) / sigma_0) * dG_du1( chi ) * g_func( chi ) ** (-3.0 / 2.0)
+            dR_dr   = (1.0 / sigma_0) * (( pair % RIJ / pair % RIJ_MAG ) + 0.5 * shape_x(I) * dG_dr( param % chi, param, pair ) * g_func( param % chi, param, pair ) ** (-3.0 / 2.0))
+            de2_dr  = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_dr( param % xhi, param, pair )
 
-            de1_du2 = (eps2 ** meu) * neu * eps1 ** (neu + 2) * (chi ** 2 * uu * U1)
-            de2_du2 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * dG_du2( xhi )
-            dR_du2  = (12.0 * sr**7 - 12.0 * sr**13) * 0.5 * (shape_x(I) / sigma_0) * dG_du2( chi ) * g_func( chi ) ** (-3.0 / 2.0)
+            de1_du1 = (eps2 ** meu) * (neu * eps1 ** (neu + 2)) * (param % chi ** 2 * param % uu * pair % U2)
+            de2_du1 = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_du1( param % xhi, param, pair )
+            dR_du1  = srd_fac * 0.5 * (shape_x(I) / sigma_0) * dG_du1( param % chi, param, pair ) * g_func( param % chi, param, pair ) ** (-3.0 / 2.0)
+
+            de1_du2 = (eps2 ** meu) * (neu * eps1 ** (neu + 2)) * (param % chi ** 2 * param % uu * pair % U1)
+            de2_du2 = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_du2( param % xhi, param, pair )
+            dR_du2  = srd_fac * 0.5 * (shape_x(I) / sigma_0) * dG_du2( param % chi, param, pair ) * g_func( param % chi, param, pair ) ** (-3.0 / 2.0)
         
-            pot = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - 2.0 * sr ** 6.0)
-            FIJ = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_dr  + de2_dr * (sr ** 12.0 - 2.0 * sr ** 6.0))
-            TI  = (-1.0) * ((sr ** 12.0 - 2.0 * sr ** 6.0) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * dR_du1))
-            TJ  = (-1.0) * ((sr ** 12.0 - 2.0 * sr ** 6.0) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * dR_du2))
-            TORQ1 = cross( U1, TI )
-            TORQ2 = cross( U2, TJ )
+            pot = (eps1 ** neu) * (eps2 ** meu) * srx_fac
+            FIJ = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * srd_fac * dR_dr  + de2_dr * srx_fac)
+            TI  = (-1.0) * (srx_fac * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * dR_du1))
+            TJ  = (-1.0) * (srx_fac * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * dR_du2))
+            TORQ1 = cross( pair % U1, TI )
+            TORQ2 = cross( pair % U2, TJ )
 
-            if ((rij_mag .ge. switch) .and. (rij_mag .le. (cutoff + wf))) then
+            if ((pair % rij_mag .ge. switch) .and. (pair % rij_mag .le. (cutoff + wf))) then
                 pot   = sx * pot
                 FIJ   = sx * FIJ   - sdx * pot * factor
                 TORQ1 = sx * TORQ1 - sdx * pot * factor
@@ -376,23 +375,10 @@ module gay_berne
             TORQ2 = 0.0
         endif
 
-        potential_energy = potential_energy + pot
-        
-        FX(I) = FX(I) + FIJ(1)
-        FY(I) = FY(I) + FIJ(2)
-        FZ(I) = FZ(I) + FIJ(3)
-        
-        FX(J) = FX(J) - FIJ(1)
-        FY(J) = FY(J) - FIJ(2)
-        FZ(J) = FZ(J) - FIJ(3)
-        
-        TX(I) = TX(I) + TORQ1(1)
-        TY(I) = TY(I) + TORQ1(2)
-        TZ(I) = TZ(I) + TORQ1(3)
-        
-        TX(J) = TX(J) + TORQ2(1)
-        TY(J) = TY(J) + TORQ2(2)
-        TZ(J) = TZ(J) + TORQ2(3)
+        PE = pot
+        FXIJ = FIJ
+        TXI = TORQ1
+        TXJ = TORQ2
 
     end subroutine gb_calculate_forces
 
@@ -402,36 +388,36 @@ module ecp
     use system
     implicit none
 
-    real(8), dimension(3, 3) :: U1, U2, S1, S2, E1, E2, EM
-    real(8), dimension(3, 3) :: AE, BE, GE, AR, BR, GR, MM1, MM2
-    real(8), dimension(3)    :: KE, KR
-    real(8)                  :: lambda_E, lambda_R
-    
-    real(8)                  :: meu = 1.0, neu = 2.0
-    real(8), dimension(3)    :: RIJ, RIJ_hat, FIJ, TORQ1, TORQ2
-    real(8)                  :: RIJ_SQ, RIJ_mag
-    real(8)                  :: eps1, eps2, sr, phi, sigma, sigma_0 = 1.0
+    type :: ecp_pair
+        real(8), dimension(3, 3) :: AE, BE, AR, BR
+        real(8), dimension(3)    :: RIJ, RIJ_hat
+        real(8)                  :: RIJ_SQ, RIJ_MAG
+    end type
 
     contains
-    real(8) function brent(func) result (res)
+    pure real(8) function brent(func, pair) result (res)
         implicit none
+        type(ecp_pair), intent(in) :: pair
         integer, parameter :: max_iter = 10000
         real(8), parameter :: eps = 1e-8, psi = 0.5 * ( 3.0 - sqrt(5.0) )
         real(8)            :: a, b, c, x, w, v, u
         real(8)            :: fa, fb, fc, ft, fw, fv, fu
-        real(8)            :: deltax = 0.0, atol = 1e-11, rtol = 1e-8
+        real(8)            :: deltax, atol, rtol
         real(8)            :: tol1, tol2, xmid, tmp1, tmp2, rat, p, dx_temp
-        integer            :: I, iter = 0
+        integer            :: I, iter
 
         interface
-            real(8) function func(xx)
-                real(8), intent(in) :: xx
+            pure real(8) function func(xx, pp)
+                import ecp_pair
+                real(8), intent(in)        :: xx
+                type(ecp_pair), intent(in) :: pp
             end function func
         end interface
 
+        deltax = 0.0; atol = 1e-11; rtol = 1e-8; iter = 0
         a = 0.0; b = 1.0 
         c = (1 - psi) * a + psi * b
-        fa = func(a); fb = func(b); fc = func(c)
+        fa = func(a, pair); fb = func(b, pair); fc = func(c, pair)
         v = c; w = v; x = w
         fv = fc; fw = fv; ft = fw
 
@@ -493,7 +479,7 @@ module ecp
 
             endif
 
-            fu = func(u)
+            fu = func(u, pair)
 
             if (fu > ft) then
 
@@ -537,62 +523,62 @@ module ecp
         res = x
     end function brent
 
-    real(8) function optim_eps( L )
+    pure real(8) function optim_eps( L, pair )
         implicit none
         real(8), intent(in)         :: L
+        type(ecp_pair), intent(in)  :: pair
         real(8), dimension(3, 3)    :: GM
         real(8), dimension(3)       :: KM
 
-        GM = ( 1 - L ) * AE + L * BE
-        KM = inverse(GM) .x. RIJ
+        GM = ( 1 - L ) * pair % AE + L * pair % BE
+        KM = inverse(GM) .x. pair % RIJ
 
-        optim_eps = -L * ( 1 - L ) * dot( RIJ, KM )
+        optim_eps = -L * ( 1 - L ) * dot( pair % RIJ, KM )
         
     end function optim_eps
 
-    real(8) function optim_dist( L )
+    pure real(8) function optim_dist( L, pair )
         implicit none
         real(8), intent(in)         :: L
+        type(ecp_pair), intent(in)  :: pair
         real(8), dimension(3, 3)    :: GM_R
         real(8), dimension(3)       :: KM_R
 
-        GM_R = ( 1 - L ) * AR + L * BR
-        KM_R = inverse(GM_R) .x. RIJ
+        GM_R = ( 1 - L ) * pair % AR + L * pair % BR
+        KM_R = inverse(GM_R) .x. pair % RIJ
 
-        optim_dist = -L * ( 1 - L ) * dot( RIJ, KM_R )
+        optim_dist = -L * ( 1 - L ) * dot( pair % RIJ, KM_R )
         
     end function optim_dist
 
-    pure function dF_dr( lam, k_vec ) result(res)
-        implicit none
-        real(8), intent(in) :: k_vec(3), lam
-        real(8)             :: coeff, res(3)
-
-        coeff = 2.0 * lam * ( 1 - lam ) / RIJ_SQ
-        res = coeff * ( k_vec - dot_product( RIJ_hat, k_vec ) * RIJ_hat )
-    end function dF_dr
-
-    pure function dF_du( lam, K_vec, M_mat ) result(res)
-        implicit none
-        real(8), intent(in) :: M_mat(3, 3), K_vec(3), lam
-        real(8)             :: coeff, res(3)
-
-        coeff = 2.0 * lam * ( 1 - lam ) / RIJ_SQ
-        res = coeff * cross( K_vec, matmul( K_vec, M_mat ) )
-    end function dF_du
-
-    subroutine ecp_calculate_forces( I, J, cutoff, width )
+    pure subroutine ecp_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width )
         implicit none
         integer, intent(in)             :: I, J
+        real(8), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
+        real(8), intent(in)             :: cutoff
         real(8), optional, intent(in)   :: width
-        real(8), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2
-        real(8), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
-        real(8)                         :: e10, e20, sigma_t1, sigma_t2, sigma_t
-        real(8)                         :: pot, cutoff, wf
-        real(8)                         :: switch, xx, sx, sdx, factor
-        logical                         :: imp_wat = .FALSE.
-        integer                         :: IX
 
+        type(ecp_pair) :: pair
+
+        real(8), dimension(3, 3) :: U1, U2, S1, S2, E1, E2, EM
+        real(8), dimension(3, 3) :: GE, GR, MM1, MM2
+        real(8), dimension(3)    :: KE, KR
+        real(8)                  :: lambda_E, lambda_R
+        real(8)                  :: meu, neu
+
+        real(8), dimension(3)    :: dR_dr, de2_dr
+        real(8), dimension(3)    :: de1_du1x, de1_du1y, de1_du1z, de1_du1, de2_du1, dR_du1
+        real(8), dimension(3)    :: de1_du2x, de1_du2y, de1_du2z, de1_du2, de2_du2, dR_du2
+        real(8), dimension(3)    :: FIJ, TORQ1, TORQ2
+
+        real(8)                  :: eps1, eps2, sr, phi, sigma, sigma_0
+        real(8)                  :: e10, e20, sigma_t1, sigma_t2, sigma_t
+        real(8)                  :: pot, wf, efac, rfac, srx_fac, srd_fac
+        real(8)                  :: switch, xx, sx, sdx, factor
+        logical                  :: imp_wat, ierr_e, ierr_r
+
+        meu = 1.0; neu = 2.0; sigma_0 = 1.0; 
+        imp_wat = .FALSE.; ierr_e = .FALSE.; ierr_r = .FALSE.
         if (present(width)) then
             wf = width
             imp_wat = .TRUE.
@@ -601,17 +587,17 @@ module ecp
             imp_wat = .FALSE.
         endif
         
-        RIJ(1) = RX(I) - RX(J)
-        RIJ(2) = RY(I) - RY(J)
-        RIJ(3) = RZ(I) - RZ(J)
+        pair % RIJ(1) = RX(I) - RX(J)
+        pair % RIJ(2) = RY(I) - RY(J)
+        pair % RIJ(3) = RZ(I) - RZ(J)
 
         if (is_periodic) then
-            RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
+            pair % RIJ = pair % RIJ - ANINT( pair % RIJ / box_length ) * box_length
         endif
 
-        RIJ_SQ = SUM( RIJ**2 )
-        RIj_MAG = SQRT( RIJ_SQ )
-        RIJ_hat = RIJ / RIj_MAG
+        pair % RIJ_SQ = SUM( pair % RIJ**2 )
+        pair % RIj_MAG = SQRT( pair % RIJ_SQ )
+        pair % RIJ_hat = pair % RIJ / pair % RIj_MAG
 
         U1(1, 1) = QW(I)**2 + QX(I)**2 - QY(I)**2 - QZ(I)**2
         U1(1, 2) = 2.0 * ( QX(I) * QY(I) + QW(I) * QZ(I) )
@@ -653,88 +639,89 @@ module ecp
         S2(2, 2) = ( shape_y(J) / 2.0 )
         S2(3, 3) = ( shape_z(J) / 2.0 )
 
-        AR = transpose(U1) .x. ( S1 ** 2.0 ) .x. U1
-        BR = transpose(U2) .x. ( S2 ** 2.0 ) .x. U2
-        AE = transpose(U1) .x. E1 .x. U1
-        BE = transpose(U2) .x. E2 .x. U2
+        MM1 = transpose(U1) .x. S1
+        MM2 = transpose(U2) .x. S2
+        pair % AR = transpose(U1) .x. ( S1 ** 2.0 ) .x. U1
+        pair % BR = transpose(U2) .x. ( S2 ** 2.0 ) .x. U2
+        pair % AE = transpose(U1) .x. E1 .x. U1
+        pair % BE = transpose(U2) .x. E2 .x. U2
 
         sigma_t1 = (shape_x(I) * shape_y(I) + shape_z(I) ** 2) * sqrt( 2.0 * shape_x(I) * shape_y(I) ) / 8.0
         sigma_t2 = (shape_x(J) * shape_y(J) + shape_z(J) ** 2) * sqrt( 2.0 * shape_x(J) * shape_y(J) ) / 8.0
         sigma_t = sqrt( sigma_t1 * sigma_t2 )
         
-        EM = inverse( AR + BR )
+        EM = inverse( pair % AR + pair % BR )
         eps1 = sigma_t * sqrt( determinant( EM ) )
         
-        lambda_E = brent( optim_eps )
+        lambda_E = brent( optim_eps, pair )
         if ( lambda_E < 0.0 .or. lambda_E > 1.0 ) then
-            write(*, *) "LE = ", lambda_E, " not within [0, 1]"
-            stop
+            ierr_e = .TRUE.
         endif
         
-        GE = ( 1 - lambda_E ) * AE + lambda_E * BE
-        KE = inverse( GE ) .x. RIJ
-        eps2 = lambda_E * (1.0 - lambda_E) * dot( RIJ_hat, KE ) / RIJ_mag
+        GE = ( 1 - lambda_E ) * pair % AE + lambda_E * pair % BE
+        KE = inverse( GE ) .x. pair % RIJ
+        eps2 = lambda_E * (1.0 - lambda_E) * dot( pair % RIJ_hat, KE ) / pair % RIJ_mag
         
-        lambda_R = brent( optim_dist )
+        lambda_R = brent( optim_dist, pair )
         if ( lambda_R < 0.0 .or. lambda_R > 1.0 ) then
-            write(*, *) "LR = ", lambda_R, " not within [0, 1]"
-            stop
+            ierr_r = .TRUE.
         endif
         
-        GR = ( 1 - lambda_R ) * AR + lambda_R * BR
-        KR = inverse( GR ) .x. RIJ
-        phi = lambda_R * (1.0 - lambda_R) * dot( RIJ_hat, KR ) / RIJ_mag
+        GR = ( 1 - lambda_R ) * pair % AR + lambda_R * pair % BR
+        KR = inverse( GR ) .x. pair % RIJ
+        phi = lambda_R * (1.0 - lambda_R) * dot( pair % RIJ_hat, KR ) / pair % RIJ_mag
         sigma = phi ** (-1.0/2.0)
+        efac = 2.0 * lambda_E * ( 1.0 - lambda_E ) / pair % RIJ_SQ
+        rfac = 2.0 * lambda_R * ( 1.0 - lambda_R ) / pair % RIJ_SQ
 
         switch = ( cutoff + wf ) - 2.0 * sigma_0    ! Apply switch function 2sigma_0 inside cutoff
         factor = 1.0 / ( ( cutoff + wf ) - switch )
-        xx = ( RIJ_MAG - switch ) * factor
+        xx = ( pair % RIJ_MAG - switch ) * factor
         sx = 1.0 - 6.0 * xx ** 5.0 + 15.0 * xx ** 4.0 - 10.0 * xx ** 3.0
         sdx = -30.0 * xx ** 4.0 + 60.0 * xx ** 3.0 - 30.0 * xx ** 2.0
 
-        if ( rij_mag < ( sigma + cutoff + wf ) ) then
+        if ( pair % rij_mag < ( sigma + cutoff + wf ) ) then
         
             if (imp_wat) then
-                if ( rij_mag < sigma ) then
-                    sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
-                else if ((rij_mag .ge. sigma) .and. (rij_mag .le. (sigma + wf))) then
+                if ( pair % rij_mag < sigma ) then
+                    sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 )
+                else if ((pair % rij_mag .ge. sigma) .and. (pair % rij_mag .le. (sigma + wf))) then
                     sr = sigma_0 / ( sigma - sigma + sigma_0 )
                 else
-                    sr = sigma_0 / ( rij_mag - sigma + sigma_0 - wf )
+                    sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 - wf )
                 endif
             else
-                sr = sigma_0 / ( rij_mag - sigma + sigma_0 )
+                sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 )
             endif
             
-            dR_dr = (1.0 / sigma_0) * (( RIJ_hat ) + 0.5 * dF_dr( lambda_R, KR ) * phi ** (-3.0 / 2.0))
-            de2_dr = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dF_dr( lambda_E, KE )
-            
-            de1_du1 = 0.0;
-            MM1 = transpose(U1) .x. S1
-            do IX = 1, 3
-                de1_du1 = de1_du1 + cross( MM1(:, IX), EM .x. MM1(:, IX) )
-            enddo
-            
-            de1_du1 = -(eps2 ** meu) * (neu * eps1 ** neu) * de1_du1
-            de2_du1 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * (1 - lambda_E) * dF_du( lambda_E, KE, AE )
-            dR_du1 =  (0.5 / sigma_0) * (1 - lambda_R) * dF_du( lambda_R, KR, AR ) * phi ** (-3.0 / 2.0)
-            
-            de1_du2 = 0.0
-            MM2 = transpose(U2) .x. S2
-            do IX = 1, 3
-                de1_du2 = de1_du2 + cross( MM2(:, IX), EM .x. MM2(:, IX) )
-            enddo
-            
-            de1_du2 = -(eps2 ** meu) * (neu * eps1 ** neu) * de1_du2
-            de2_du2 = (eps1 ** neu) * meu * eps2 ** (meu - 1) * lambda_E * dF_du( lambda_E, KE, BE )
-            dR_du2 =  (0.5 / sigma_0) * lambda_R * dF_du( lambda_R, KR, BR ) * phi ** (-3.0 / 2.0)
-            
-            pot   = (eps1 ** neu) * (eps2 ** meu) * (sr ** 12.0 - 2.0 * sr ** 6.0)
-            FIJ   = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_dr  + (sr**12 - 2.0*sr**6) * de2_dr)
-            TORQ1 = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du1 + de2_du1) + ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_du1))
-            TORQ2 = (-1.0) * ((sr**12 - 2.0*sr**6) * (de1_du2 + de2_du2) + ((eps1 ** neu) * (eps2 ** meu) * (12.0 * sr**7 - 12.0 * sr**13) * dR_du2))
+            srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
+            srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
 
-            if ((rij_mag .ge. switch) .and. (rij_mag .le. (cutoff + wf))) then
+            dR_dr = (1.0 / sigma_0) * (  ( pair % RIJ_hat )     + 0.5 * rfac * ( KR - dot_product( pair % RIJ_hat, KR ) * pair % RIJ_hat ) * phi ** (-3.0 / 2.0)  )
+            de2_dr = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * efac * ( KE - dot_product( pair % RIJ_hat, KE ) * pair % RIJ_hat )
+
+            de1_du1x = (eps2 ** meu) * (neu * eps1 ** neu) * srx_fac * cross( MM1(:, 1), ( EM .x. MM1(:, 1) ) )
+            de1_du1y = (eps2 ** meu) * (neu * eps1 ** neu) * srx_fac * cross( MM1(:, 2), ( EM .x. MM1(:, 2) ) )
+            de1_du1z = (eps2 ** meu) * (neu * eps1 ** neu) * srx_fac * cross( MM1(:, 3), ( EM .x. MM1(:, 3) ) )
+
+            de1_du1 = (de1_du1x + de1_du1y + de1_du1z)
+            de2_du1 = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * srx_fac * (1 - lambda_E) * efac * cross( KE .x. pair % AE, KE )
+            dR_du1 = (eps1 ** neu) * (eps2 ** meu) * srd_fac * (0.5 / sigma_0) * (1 - lambda_R) * rfac * cross( KR .x. pair % AR, KR ) * phi ** (-3.0 / 2.0)
+
+            de1_du2x = (eps2 ** meu) * (neu * eps1 ** neu) * srx_fac * cross( MM2(:, 1), ( EM .x. MM2(:, 1) ) )
+            de1_du2y = (eps2 ** meu) * (neu * eps1 ** neu) * srx_fac * cross( MM2(:, 2), ( EM .x. MM2(:, 2) ) )
+            de1_du2z = (eps2 ** meu) * (neu * eps1 ** neu) * srx_fac * cross( MM2(:, 3), ( EM .x. MM2(:, 3) ) )
+
+            de1_du2 = (de1_du2x + de1_du2y + de1_du2z)
+            de2_du2 = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * srx_fac * lambda_E * efac * cross( KE .x. pair % BE, KE )
+            dR_du2 = (eps1 ** neu) * (eps2 ** meu) * srd_fac * (0.5 / sigma_0) * lambda_R * rfac * cross( KR .x. pair % BR, KR ) * phi ** (-3.0 / 2.0)
+            
+            pot   = (eps1 ** neu) * (eps2 ** meu) * srx_fac
+            FIJ   = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * srd_fac * dR_dr  + srx_fac * de2_dr)
+            TORQ1 = (de1_du1 + de2_du1 + dR_du1)
+            TORQ2 = (de1_du2 + de2_du2 + dR_du2)
+
+            if ((pair % rij_mag .ge. switch) .and. (pair % rij_mag .le. (cutoff + wf))) then
                 pot   = sx * pot
                 FIJ   = sx * FIJ   - sdx * pot * factor
                 TORQ1 = sx * TORQ1 - sdx * pot * factor
@@ -748,26 +735,666 @@ module ecp
             TORQ2 = 0.0
         endif
         
-        potential_energy = potential_energy + pot
-        
-        FX(I) = FX(I) + FIJ(1)
-        FY(I) = FY(I) + FIJ(2)
-        FZ(I) = FZ(I) + FIJ(3)
-        
-        FX(J) = FX(J) - FIJ(1)
-        FY(J) = FY(J) - FIJ(2)
-        FZ(J) = FZ(J) - FIJ(3)
-        
-        TX(I) = TX(I) + TORQ1(1)
-        TY(I) = TY(I) + TORQ1(2)
-        TZ(I) = TZ(I) + TORQ1(3)
-        
-        TX(J) = TX(J) + TORQ2(1)
-        TY(J) = TY(J) + TORQ2(2)
-        TZ(J) = TZ(J) + TORQ2(3)
+        PE = pot
+        FXIJ = FIJ
+        TXI = TORQ1
+        TXJ = TORQ2
         
     end subroutine ecp_calculate_forces
 end module ecp
+
+module gay_berne_chiral
+    use system
+    implicit none
+    
+    type :: gb_parameters
+        real(8) :: ru1, ru2, uu, chi, xhi
+    end type
+    
+    type :: gb_pair
+        real(8), dimension(3)   :: U1, U2, RIJ, RIJ_hat
+        real(8)                 :: rij_sq, rij_mag
+    end type
+
+    contains
+    pure function g_func( chie, param, pair ) result (res)
+        implicit none
+        real(8), intent(in)             :: chie
+        type(gb_parameters), intent(in) :: param
+        type(gb_pair), intent(in)       :: pair
+        real(8)                         :: term1, term2, res
+
+        term1 = (param % ru1 + param % ru2)**2 / (1 + chie * param % uu)
+        term2 = (param % ru1 - param % ru2)**2 / (1 - chie * param % uu)
+        
+        res = 1 - (chie / 2.0 / pair % rij_sq) * (term1 + term2)
+
+    end function g_func
+
+    pure function dG_dr( chie, param, pair ) result (res)
+        implicit none
+        real(8), intent(in)             :: chie
+        type(gb_parameters), intent(in) :: param
+        type(gb_pair), intent(in)       :: pair
+        real(8), dimension(3)           :: term1, term2, res
+
+        term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu)) * (pair % U1 + pair % U2)
+        term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu)) * (pair % U1 - pair % U2)
+        
+        res = (-chie / pair % RIJ_SQ ) * (term1 + term2) + (2 * pair % RIJ / pair % RIJ_SQ) * (1 - g_func( chie, param, pair ))
+
+    end function dG_dr
+
+    pure function dG_du1( chie, param, pair ) result(res)
+        implicit none
+        real(8), intent(in)             :: chie
+        type(gb_parameters), intent(in) :: param
+        type(gb_pair), intent(in)       :: pair
+        real(8)                         :: term1, term2, res(3)
+        
+        term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu))
+        term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu))
+        
+        res = (-chie * pair % RIJ / pair % rij_sq ) * (term1 + term2) + ((chie**2 * pair % U2) / (2 * pair % rij_sq)) * (term1 ** 2 - term2 ** 2)
+        
+    end function dG_du1
+
+    pure function dG_du2( chie, param, pair ) result(res)
+        implicit none
+        real(8), intent(in)             :: chie
+        type(gb_parameters), intent(in) :: param
+        type(gb_pair), intent(in)       :: pair
+        real(8)                         :: term1, term2, res(3)
+        
+        term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu))
+        term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu))
+        
+        res = (-chie * pair % RIJ / pair % RIJ_SQ ) * (term1 - term2) + ((chie**2 * pair % U1) / (2 * pair % rij_sq)) * (term1 ** 2 - term2 ** 2)
+        
+    end function dG_du2
+
+    pure subroutine gbc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality )
+        implicit none
+        integer, intent(in)             :: I, J
+        real(8), intent(in)             :: cutoff
+        real(8), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
+        real(8), optional, intent(in)   :: width, chirality
+        
+        type(gb_parameters)             :: param
+        type(gb_pair)                   :: pair
+        
+        real(8), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2, U1XU2
+        real(8), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
+        real(8), dimension(3)           :: duur_dr, duur_du1, duur_du2, duu_du1, duu_du2
+        real(8), dimension(3)           :: FIJ, TI, TJ, TORQ1, TORQ2
+        real(8), dimension(3)           :: FIJ_chiral, TI_chiral, TJ_chiral, TORQ1_chiral, TORQ2_chiral
+
+        real(8)                         :: meu, neu, uur, uu
+        real(8)                         :: eps1, eps2, sr, sr_cut, sigma, sigma_0
+        real(8)                         :: pot, pot_chiral, wf, ch_str
+        real(8)                         :: switch, xx, sx, sdx, factor, srx_fac, srd_fac
+        logical                         :: imp_wat
+
+        meu = 1.0; neu = 2.0; sigma_0 = 1.0; imp_wat = .FALSE.
+
+        if (present(width)) then
+            wf = width
+            imp_wat = .TRUE.
+        else
+            wf = 0.0
+            imp_wat = .FALSE.
+        endif
+
+        if (present(chirality)) then
+            ch_str = chirality
+        else
+            ch_str = 0.0
+        endif
+
+        pair % RIJ(1) = RX(I) - RX(J)
+        pair % RIJ(2) = RY(I) - RY(J)
+        pair % RIJ(3) = RZ(I) - RZ(J)
+
+        if (is_periodic) then
+            pair % RIJ = pair % RIJ - ANINT( pair % RIJ / box_length ) * box_length
+        endif
+
+        pair % RIJ_SQ = SUM( pair % RIJ**2 )
+        pair % RIJ_MAG = SQRT( pair % RIJ_SQ )
+        pair % RIJ_hat = pair % RIJ / pair % RIJ_MAG
+
+        pair % U1(1) = 2.0 *  ( QX(I) * QZ(I) + QW(I) * QY(I) )
+        pair % U1(2) = 2.0 *  ( QY(I) * QZ(I) - QW(I) * QX(I) )
+        pair % U1(3) = QW(I)**2 - QX(I)**2 - QY(I)**2 + QZ(I)**2
+
+        pair % U2(1) = 2.0 *  ( QX(J) * QZ(J) + QW(J) * QY(J) )
+        pair % U2(2) = 2.0 *  ( QY(J) * QZ(J) - QW(J) * QX(J) )
+        pair % U2(3) = QW(J)**2 - QX(J)**2 - QY(J)**2 + QZ(J)**2
+
+        ! CALCULATE GAY BERNE PARAMETERS
+
+        param % ru1 = dot( pair % RIJ, pair % U1 )
+        param % ru2 = dot( pair % RIJ, pair % U2 )
+        param % uu  = dot( pair % U1, pair % U2 )
+        param % chi = ( shape_z(I) ** 2 - shape_x(I) ** 2 ) / ( shape_z(I) ** 2 + shape_x(I) ** 2 )
+        param % xhi = ( eshape_x(I) ** (1.0/meu) - eshape_z(I) ** (1.0/meu) ) / ( eshape_x(I) ** (1.0/meu) + eshape_z(I) ** (1.0/meu) )
+
+        eps1 = ( 1 - ( param % chi * param % uu ) ** 2) ** (-1.0 / 2.0)
+        eps2 = g_func( param % xhi, param, pair )
+        sigma = shape_x(I) * g_func( param % chi, param, pair ) ** (-1.0 / 2.0)
+
+        switch = ( cutoff + wf ) - 2.0 * sigma_0    ! Apply switch function 2sigma_0 inside cutoff
+        factor = 1.0 / ( ( cutoff + wf ) - switch )
+        xx = ( pair % RIJ_MAG - switch ) * factor
+        sx = 1.0 - 6.0 * xx ** 5.0 + 15.0 * xx ** 4.0 - 10.0 * xx ** 3.0
+        sdx = -30.0 * xx ** 4.0 + 60.0 * xx ** 3.0 - 30.0 * xx ** 2.0
+
+        if ( pair % RIJ_MAG < ( sigma + cutoff + wf ) ) then
+
+            if (imp_wat) then
+                if ( pair % RIJ_MAG < sigma ) then
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+                else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
+                    sr = sigma_0 / ( sigma - sigma + sigma_0 )
+                else
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
+                endif
+            else
+                sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+            endif
+
+            ! EVALUATE NORMAL GB POTENTIAL
+
+            srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
+            srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
+
+            dR_dr   = (eps1 ** neu) * (eps2 ** meu) * (1.0 / sigma_0) * (( pair % RIJ / pair % RIJ_MAG ) + 0.5 * shape_x(I) * dG_dr( param % chi, param, pair ) * g_func( param % chi, param, pair ) ** (-3.0 / 2.0))
+            de2_dr  = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_dr( param % xhi, param, pair )
+
+            de1_du1 = (eps2 ** meu) * (neu * eps1 ** (neu + 2)) * (param % chi ** 2 * param % uu * pair % U2)
+            de2_du1 = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_du1( param % xhi, param, pair )
+            dR_du1  = (eps1 ** neu) * (eps2 ** meu) * 0.5 * (shape_x(I) / sigma_0) * dG_du1( param % chi, param, pair ) * g_func( param % chi, param, pair ) ** (-3.0 / 2.0)
+
+            de1_du2 = (eps2 ** meu) * (neu * eps1 ** (neu + 2)) * (param % chi ** 2 * param % uu * pair % U1)
+            de2_du2 = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_du2( param % xhi, param, pair )
+            dR_du2  = (eps1 ** neu) * (eps2 ** meu) * 0.5 * (shape_x(I) / sigma_0) * dG_du2( param % chi, param, pair ) * g_func( param % chi, param, pair ) ** (-3.0 / 2.0)
+        
+            pot = (eps1 ** neu) * (eps2 ** meu) * srx_fac
+            FIJ = (-1.0) * ( srx_fac *  de2_dr             + srd_fac * dR_dr  )
+            TI  = (-1.0) * ( srx_fac * (de1_du1 + de2_du1) + srd_fac * dR_du1 )
+            TJ  = (-1.0) * ( srx_fac * (de1_du2 + de2_du2) + srd_fac * dR_du2 )
+            TORQ1 = cross( pair % U1, TI )
+            TORQ2 = cross( pair % U2, TJ )
+
+            ! EVALUATE CHIRAL TERMS
+
+            ! srx_fac = (sr ** 7.0)
+            ! srd_fac = (-7.0 * sr ** 8.0)
+            u1xu2   = cross( pair % u1, pair % u2 )
+            uur     = dot_product( U1XU2, pair % RIJ_hat )
+            uu      = param % uu
+
+            dR_dr   = dR_dr  * srd_fac * uur * uu
+            de2_dr  = de2_dr * srx_fac * uur * uu
+            duur_dr = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uu * ( U1XU2 - dot( U1XU2, pair % RIJ_hat ) * pair % RIJ_hat ) / pair % rij_mag
+
+            de1_du1  = de1_du1 * srx_fac * uur * uu
+            de2_du1  = de2_du1 * srx_fac * uur * uu
+            dR_du1   = dR_du1  * srd_fac * uur * uu
+            duur_du1 = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uu * cross( pair % U2, pair % RIJ_hat )
+            duu_du1  = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uur * pair % U2
+
+            de1_du2  = de1_du2 * srx_fac * uur * uu
+            de2_du2  = de2_du2 * srx_fac * uur * uu
+            dR_du2   = dR_du2  * srd_fac * uur * uu
+            duur_du2 = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uu * cross( pair % RIJ_hat, pair % U1 )
+            duu_du2  = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uur * pair % U1
+
+            pot_chiral   = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uur * uu
+            FIJ_chiral   = (-1.0) * (          de2_dr  + dR_dr  + duur_dr           )
+            TI           = (-1.0) * (de1_du1 + de2_du1 + dR_du1 + duur_du1 + duu_du1)
+            TJ           = (-1.0) * (de1_du2 + de2_du2 + dR_du2 + duur_du2 + duu_du2)
+            TORQ1_chiral = cross( pair % U1, TI )
+            TORQ2_chiral = cross( pair % U2, TJ )
+
+            pot   = pot   + ch_str * pot_chiral
+            FIJ   = FIJ   + ch_str * FIJ_chiral
+            TORQ1 = TORQ1 + ch_str * TORQ1_chiral
+            TORQ2 = TORQ2 + ch_str * TORQ2_chiral
+
+            if ((pair % rij_mag .ge. switch) .and. (pair % rij_mag .le. (cutoff + wf))) then
+                pot   = sx * pot
+                FIJ   = sx * FIJ   - sdx * pot * factor
+                TORQ1 = sx * TORQ1 - sdx * pot * factor
+                TORQ2 = sx * TORQ2 - sdx * pot * factor
+            endif
+
+        else
+            pot = 0.0
+            FIJ = 0.0
+            TORQ1 = 0.0
+            TORQ2 = 0.0
+        endif
+
+        PE = pot
+        FXIJ = FIJ
+        TXI = TORQ1
+        TXJ = TORQ2
+
+    end subroutine gbc_calculate_forces
+
+end module gay_berne_chiral
+
+module ecp_chiral
+    use system
+    implicit none
+
+    type :: ecp_pair
+        real(8), dimension(3, 3) :: AE, BE, AR, BR
+        real(8), dimension(3)    :: RIJ, RIJ_hat
+        real(8)                  :: RIJ_SQ, RIJ_MAG
+    end type
+
+    contains
+    pure real(8) function brent(func, pair) result (res)
+        implicit none
+        type(ecp_pair), intent(in) :: pair
+        integer, parameter :: max_iter = 10000
+        real(8), parameter :: eps = 1e-8, psi = 0.5 * ( 3.0 - sqrt(5.0) )
+        real(8)            :: a, b, c, x, w, v, u
+        real(8)            :: fa, fb, fc, ft, fw, fv, fu
+        real(8)            :: deltax, atol, rtol
+        real(8)            :: tol1, tol2, xmid, tmp1, tmp2, rat, p, dx_temp
+        integer            :: I, iter
+
+        interface
+            pure real(8) function func(xx, pp)
+                import ecp_pair
+                real(8), intent(in)        :: xx
+                type(ecp_pair), intent(in) :: pp
+            end function func
+        end interface
+
+        deltax = 0.0; atol = 1e-11; rtol = 1e-8; iter = 0
+        a = 0.0; b = 1.0 
+        c = (1 - psi) * a + psi * b
+        fa = func(a, pair); fb = func(b, pair); fc = func(c, pair)
+        v = c; w = v; x = w
+        fv = fc; fw = fv; ft = fw
+
+        do while (iter < max_iter)
+            tol1 = rtol * abs(x) + atol
+            tol2 = 2.0 * tol1
+            xmid = 0.5 * (a + b)
+
+            if (abs(x - xmid) < (tol2 - 0.5 * (b - a))) exit
+
+            if (abs(deltax) <= tol1) then
+                if (x >= xmid) then
+                    deltax = a - x
+                else
+                    deltax = b - x
+                endif
+                rat = psi * deltax
+
+            else
+                tmp1 = (x - w) * (ft - fv)
+                tmp2 = (x - v) * (ft - fw)
+                p = (x - v) * tmp2 - (x - w) * tmp1
+                tmp2 = 2.0 * (tmp2 - tmp1)
+
+                if (tmp2 > 0.0) p = -p
+
+                tmp2 = abs(tmp2)
+                dx_temp = deltax
+                deltax = rat
+                
+                if ((p > tmp2 * (a - x)) .and. (p < tmp2 * (b - x)) .and. (abs(p) < abs(0.5 * tmp2 * dx_temp))) then
+                    rat = p * 1.0 / tmp2
+                    u = x + rat
+                    if ((u - a) < tol2 .or. (b - u) < tol2) then
+                        if (xmid - x >= 0) then
+                            rat = tol1
+                        else
+                            rat = -tol1
+                        endif
+                    endif
+                else
+                    if (x >= xmid) then
+                        deltax = a - x 
+                    else
+                        deltax = b - x
+                    endif
+                    rat = psi * deltax
+                endif
+            endif
+
+            if (abs(rat) < tol1) then
+                if (rat >= 0) then
+                    u = x + tol1
+                else
+                    u = x - tol1
+                endif
+            else
+                u = x + rat
+
+            endif
+
+            fu = func(u, pair)
+
+            if (fu > ft) then
+
+                if (u < x) then
+                    a = u
+                else
+                    b = u
+                endif
+
+                if ((fu <= fw) .or. (w == x)) then
+                    v = w
+                    w = u
+                    fv = fw
+                    fw = fu
+
+                else if ((fu <= fv) .or. (v == x) .or. (v == w)) then
+                    v = u
+                    fv = fu
+                endif
+
+            else
+
+                if (u >= x) then
+                    a = x
+                else
+                    b = x
+                endif
+
+                v = w
+                w = x
+                x = u
+                fv = fw
+                fw = ft
+                ft = fu
+
+            endif
+            iter = iter + 1
+    
+        enddo
+
+        res = x
+    end function brent
+
+    pure real(8) function optim_eps( L, pair )
+        implicit none
+        real(8), intent(in)         :: L
+        type(ecp_pair), intent(in)  :: pair
+        real(8), dimension(3, 3)    :: GM
+        real(8), dimension(3)       :: KM
+
+        GM = ( 1 - L ) * pair % AE + L * pair % BE
+        KM = inverse(GM) .x. pair % RIJ
+
+        optim_eps = -L * ( 1 - L ) * dot( pair % RIJ, KM )
+        
+    end function optim_eps
+
+    pure real(8) function optim_dist( L, pair )
+        implicit none
+        real(8), intent(in)         :: L
+        type(ecp_pair), intent(in)  :: pair
+        real(8), dimension(3, 3)    :: GM_R
+        real(8), dimension(3)       :: KM_R
+
+        GM_R = ( 1 - L ) * pair % AR + L * pair % BR
+        KM_R = inverse(GM_R) .x. pair % RIJ
+
+        optim_dist = -L * ( 1 - L ) * dot( pair % RIJ, KM_R )
+        
+    end function optim_dist
+
+    pure subroutine ecpc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality )
+        implicit none
+        integer, intent(in)             :: I, J
+        real(8), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
+        real(8), intent(in)             :: cutoff
+        real(8), optional, intent(in)   :: width, chirality
+
+        type(ecp_pair) :: pair
+
+        real(8), dimension(3, 3) :: U1, U2, S1, S2, E1, E2, EM
+        real(8), dimension(3, 3) :: GE, GR, MM1, MM2
+        real(8), dimension(3)    :: KE, KR, U1XU2
+        real(8)                  :: lambda_E, lambda_R
+        real(8)                  :: meu, neu, uur, uu
+
+        real(8), dimension(3)    :: dR_dr, de2_dr
+        real(8), dimension(3)    :: de1_du1x, de1_du1y, de1_du1z, de1_du1, de2_du1, dR_du1
+        real(8), dimension(3)    :: de1_du2x, de1_du2y, de1_du2z, de1_du2, de2_du2, dR_du2
+        real(8), dimension(3)    :: duur_dr, duur_du1z, duur_du2z, duur_du1, duur_du2
+        real(8), dimension(3)    :: duu_du1z, duu_du2z, duu_du1, duu_du2
+        real(8), dimension(3)    :: FIJ, TORQ1, TORQ2
+        real(8), dimension(3)    :: FIJ_chiral, TORQ1_chiral, TORQ2_chiral
+
+        real(8)                  :: eps1, eps2, sr, phi, sigma, sigma_0, ch_str
+        real(8)                  :: e10, e20, sigma_t1, sigma_t2, sigma_t
+        real(8)                  :: pot, wf, efac, rfac, srx_fac, srd_fac
+        real(8)                  :: switch, xx, sx, sdx, factor, pot_chiral
+        logical                  :: imp_wat, ierr_e, ierr_r
+
+        meu = 1.0; neu = 2.0; sigma_0 = 1.0; 
+        imp_wat = .FALSE.; ierr_e = .FALSE.; ierr_r = .FALSE.
+        if (present(width)) then
+            wf = width
+            imp_wat = .TRUE.
+        else
+            wf = 0.0
+            imp_wat = .FALSE.
+        endif
+
+        if (present(chirality)) then
+            ch_str = chirality
+        else
+            ch_str = 0.0
+        endif
+        
+        pair % RIJ(1) = RX(I) - RX(J)
+        pair % RIJ(2) = RY(I) - RY(J)
+        pair % RIJ(3) = RZ(I) - RZ(J)
+
+        if (is_periodic) then
+            pair % RIJ = pair % RIJ - ANINT( pair % RIJ / box_length ) * box_length
+        endif
+
+        pair % RIJ_SQ = SUM( pair % RIJ**2 )
+        pair % RIj_MAG = SQRT( pair % RIJ_SQ )
+        pair % RIJ_hat = pair % RIJ / pair % RIj_MAG
+
+        U1(1, 1) = QW(I)**2 + QX(I)**2 - QY(I)**2 - QZ(I)**2
+        U1(1, 2) = 2.0 * ( QX(I) * QY(I) + QW(I) * QZ(I) )
+        U1(1, 3) = 2.0 * ( QX(I) * QZ(I) - QW(I) * QY(I) )
+        U1(2, 1) = 2.0 * ( QX(I) * QY(I) - QW(I) * QZ(I) )
+        U1(2, 2) = QW(I)**2 - QX(I)**2 + QY(I)**2 - QZ(I)**2
+        U1(2, 3) = 2.0 * ( QY(I) * QZ(I) + QW(I) * QX(I) )
+        U1(3, 1) = 2.0 * ( QX(I) * QZ(I) + QW(I) * QY(I) )
+        U1(3, 2) = 2.0 * ( QY(I) * QZ(I) - QW(I) * QX(I) )
+        U1(3, 3) = QW(I)**2 - QX(I)**2 - QY(I)**2 + QZ(I)**2
+
+        U2(1, 1) = QW(J)**2 + QX(J)**2 - QY(J)**2 - QZ(J)**2
+        U2(1, 2) = 2.0 * ( QX(J) * QY(J) + QW(J) * QZ(J) )
+        U2(1, 3) = 2.0 * ( QX(J) * QZ(J) - QW(J) * QY(J) )
+        U2(2, 1) = 2.0 * ( QX(J) * QY(J) - QW(J) * QZ(J) )
+        U2(2, 2) = QW(J)**2 - QX(J)**2 + QY(J)**2 - QZ(J)**2
+        U2(2, 3) = 2.0 * ( QY(J) * QZ(J) + QW(J) * QX(J) )
+        U2(3, 1) = 2.0 * ( QX(J) * QZ(J) + QW(J) * QY(J) )
+        U2(3, 2) = 2.0 * ( QY(J) * QZ(J) - QW(J) * QX(J) )
+        U2(3, 3) = QW(J)**2 - QX(J)**2 - QY(J)**2 + QZ(J)**2
+
+        e10 = max( eshape_x(I), eshape_y(I), eshape_z(I) )
+        e20 = max( eshape_x(J), eshape_y(J), eshape_z(J) )
+        E1 = 0.0_8; E2 = 0.0_8; S1 = 0.0_8; S2 = 0.0_8
+
+        E1(1, 1) = ( (e10 / eshape_x(I)) ** (1/meu) ) / 4.0
+        E1(2, 2) = ( (e10 / eshape_y(I)) ** (1/meu) ) / 4.0
+        E1(3, 3) = ( (e10 / eshape_z(I)) ** (1/meu) ) / 4.0
+
+        E2(1, 1) = ( (e20 / eshape_x(J)) ** (1/meu) ) / 4.0
+        E2(2, 2) = ( (e20 / eshape_y(J)) ** (1/meu) ) / 4.0
+        E2(3, 3) = ( (e20 / eshape_z(J)) ** (1/meu) ) / 4.0
+
+        S1(1, 1) = ( shape_x(I) / 2.0 )
+        S1(2, 2) = ( shape_y(I) / 2.0 )
+        S1(3, 3) = ( shape_z(I) / 2.0 )
+
+        S2(1, 1) = ( shape_x(J) / 2.0 )
+        S2(2, 2) = ( shape_y(J) / 2.0 )
+        S2(3, 3) = ( shape_z(J) / 2.0 )
+
+        MM1 = transpose(U1) .x. S1
+        MM2 = transpose(U2) .x. S2
+        pair % AR = transpose(U1) .x. ( S1 ** 2.0 ) .x. U1
+        pair % BR = transpose(U2) .x. ( S2 ** 2.0 ) .x. U2
+        pair % AE = transpose(U1) .x. E1 .x. U1
+        pair % BE = transpose(U2) .x. E2 .x. U2
+
+        sigma_t1 = (shape_x(I) * shape_y(I) + shape_z(I) ** 2) * sqrt( 2.0 * shape_x(I) * shape_y(I) ) / 8.0
+        sigma_t2 = (shape_x(J) * shape_y(J) + shape_z(J) ** 2) * sqrt( 2.0 * shape_x(J) * shape_y(J) ) / 8.0
+        sigma_t = sqrt( sigma_t1 * sigma_t2 )
+        
+        EM = inverse( pair % AR + pair % BR )
+        eps1 = sigma_t * sqrt( determinant( EM ) )
+        
+        lambda_E = brent( optim_eps, pair )
+        if ( lambda_E < 0.0 .or. lambda_E > 1.0 ) then
+            ierr_e = .TRUE.
+        endif
+        
+        GE = ( 1 - lambda_E ) * pair % AE + lambda_E * pair % BE
+        KE = inverse( GE ) .x. pair % RIJ
+        eps2 = lambda_E * (1.0 - lambda_E) * dot( pair % RIJ_hat, KE ) / pair % RIJ_mag
+        
+        lambda_R = brent( optim_dist, pair )
+        if ( lambda_R < 0.0 .or. lambda_R > 1.0 ) then
+            ierr_r = .TRUE.
+        endif
+        
+        GR = ( 1 - lambda_R ) * pair % AR + lambda_R * pair % BR
+        KR = inverse( GR ) .x. pair % RIJ
+        phi = lambda_R * (1.0 - lambda_R) * dot( pair % RIJ_hat, KR ) / pair % RIJ_mag
+        sigma = phi ** (-1.0/2.0)
+        efac = 2.0 * lambda_E * ( 1.0 - lambda_E ) / pair % RIJ_SQ
+        rfac = 2.0 * lambda_R * ( 1.0 - lambda_R ) / pair % RIJ_SQ
+
+        switch = ( cutoff + wf ) - 2.0 * sigma_0    ! Apply switch function 2sigma_0 inside cutoff
+        factor = 1.0 / ( ( cutoff + wf ) - switch )
+        xx = ( pair % RIJ_MAG - switch ) * factor
+        sx = 1.0 - 6.0 * xx ** 5.0 + 15.0 * xx ** 4.0 - 10.0 * xx ** 3.0
+        sdx = -30.0 * xx ** 4.0 + 60.0 * xx ** 3.0 - 30.0 * xx ** 2.0
+
+        if ( pair % rij_mag < ( sigma + cutoff + wf ) ) then
+        
+            if (imp_wat) then
+                if ( pair % rij_mag < sigma ) then
+                    sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 )
+                else if ((pair % rij_mag .ge. sigma) .and. (pair % rij_mag .le. (sigma + wf))) then
+                    sr = sigma_0 / ( sigma - sigma + sigma_0 )
+                else
+                    sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 - wf )
+                endif
+            else
+                sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 )
+            endif
+
+            ! EVALUATE NORMAL ECP POTENTIAL
+            
+            srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
+            srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
+
+            dR_dr = (1.0 / sigma_0) * (  ( pair % RIJ_hat )     + 0.5 * rfac * ( KR - dot_product( pair % RIJ_hat, KR ) * pair % RIJ_hat ) * phi ** (-3.0 / 2.0)  )
+            de2_dr = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * efac * ( KE - dot_product( pair % RIJ_hat, KE ) * pair % RIJ_hat )
+
+            de1_du1x = (eps2 ** meu) * (neu * eps1 ** neu) * cross( MM1(:, 1), ( EM .x. MM1(:, 1) ) )
+            de1_du1y = (eps2 ** meu) * (neu * eps1 ** neu) * cross( MM1(:, 2), ( EM .x. MM1(:, 2) ) )
+            de1_du1z = (eps2 ** meu) * (neu * eps1 ** neu) * cross( MM1(:, 3), ( EM .x. MM1(:, 3) ) )
+
+            de1_du1 = (de1_du1x + de1_du1y + de1_du1z)
+            de2_du1 = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * (1 - lambda_E) * efac * cross( KE .x. pair % AE, KE )
+            dR_du1 = (eps1 ** neu) * (eps2 ** meu) * (0.5 / sigma_0) * (1 - lambda_R) * rfac * cross( KR .x. pair % AR, KR ) * phi ** (-3.0 / 2.0)
+
+            de1_du2x = (eps2 ** meu) * (neu * eps1 ** neu) * cross( MM2(:, 1), ( EM .x. MM2(:, 1) ) )
+            de1_du2y = (eps2 ** meu) * (neu * eps1 ** neu) * cross( MM2(:, 2), ( EM .x. MM2(:, 2) ) )
+            de1_du2z = (eps2 ** meu) * (neu * eps1 ** neu) * cross( MM2(:, 3), ( EM .x. MM2(:, 3) ) )
+
+            de1_du2 = (de1_du2x + de1_du2y + de1_du2z)
+            de2_du2 = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * lambda_E * efac * cross( KE .x. pair % BE, KE )
+            dR_du2 = (eps1 ** neu) * (eps2 ** meu) * (0.5 / sigma_0) * lambda_R * rfac * cross( KR .x. pair % BR, KR ) * phi ** (-3.0 / 2.0)
+
+            pot   = (eps1 ** neu) * (eps2 ** meu) * srx_fac
+            FIJ   = (-1.0) * ((eps1 ** neu) * (eps2 ** meu) * srd_fac * dR_dr  + srx_fac * de2_dr)
+            
+            TORQ1 = (srx_fac * (de1_du1 + de2_du1) + srd_fac * dR_du1)
+            TORQ2 = (srx_fac * (de1_du2 + de2_du2) + srd_fac * dR_du2)
+
+            ! EVALUATE CHIRAL TERMS
+
+            ! srx_fac = (sr ** 7.0)
+            ! srd_fac = (-7.0 * sr ** 8.0)
+            u1xu2   = cross( U1(3, :), U2(3, :) )
+            uur     = dot_product( u1xu2, pair % RIJ_hat )
+            uu      = dot( U1(3, :), U2(3, :) )
+
+            dR_dr   = (eps1 ** neu) * (eps2 ** meu) * dR_dr  * srd_fac * uur * uu
+            de2_dr  = de2_dr * srx_fac * uur * uu
+            duur_dr = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uu * ( U1XU2 - dot( U1XU2, pair % RIJ_hat ) * pair % RIJ_hat ) / pair % rij_mag
+
+            de1_du1   = de1_du1 * srx_fac * uur * uu
+            de2_du1   = de2_du1 * srx_fac * uur * uu
+            dR_du1    = dR_du1  * srd_fac * uur * uu
+            duur_du1z = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uu * cross( U2(3, :), pair % RIJ_hat )
+            duu_du1z  = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uur * U2(3, :)
+
+            de1_du2   = de1_du2 * srx_fac * uur * uu
+            de2_du2   = de2_du2 * srx_fac * uur * uu
+            dR_du2    = dR_du2  * srd_fac * uur * uu
+            duur_du2z = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uu * cross( pair % RIJ_hat, U1(3, :) )
+            duu_du2z  = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uur * U1(3, :)
+
+            duur_du1  = (cross( U1(3, :), duur_du1z ))
+            duu_du1   = (cross( U1(3, :), duu_du1z  ))
+
+            duur_du2  = (cross( U2(3, :), duur_du2z ))
+            duu_du2   = (cross( U2(3, :), duu_du2z  ))
+
+            pot_chiral   = (eps1 ** neu) * (eps2 ** meu) * srx_fac * uur * uu
+            FIJ_chiral   = (-1.0) * (de2_dr  + dR_dr  + duur_dr)
+            TORQ1_chiral = (de1_du1 + de2_du1 + dR_du1 - duur_du1 - duu_du1)
+            TORQ2_chiral = (de1_du2 + de2_du2 + dR_du2 - duur_du2 - duu_du2)
+
+            pot   = pot   + ch_str * pot_chiral
+            FIJ   = FIJ   + ch_str * FIJ_chiral
+            TORQ1 = TORQ1 + ch_str * TORQ1_chiral
+            TORQ2 = TORQ2 + ch_str * TORQ2_chiral
+
+            if ((pair % rij_mag .ge. switch) .and. (pair % rij_mag .le. (cutoff + wf))) then
+                pot   = sx * pot
+                FIJ   = sx * FIJ   - sdx * pot * factor
+                TORQ1 = sx * TORQ1 - sdx * pot * factor
+                TORQ2 = sx * TORQ2 - sdx * pot * factor
+            endif
+
+        else
+            pot = 0.0
+            FIJ = 0.0
+            TORQ1 = 0.0
+            TORQ2 = 0.0
+        endif
+        
+        PE = pot
+        FXIJ = FIJ
+        TXI = TORQ1
+        TXJ = TORQ2
+        
+    end subroutine ecpc_calculate_forces
+end module ecp_chiral
 
 module bonded_interactions
     use system
