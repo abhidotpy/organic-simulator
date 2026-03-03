@@ -470,6 +470,8 @@ module system
 
         if (not(present(m))) then
             message = .TRUE.
+        else
+            message = m
         endif
 
         if(message) write(*, *)
@@ -567,9 +569,32 @@ module system
 
     end subroutine calculate_state_variables
 
-    ! subroutine copy_translation( from, to, offset )
-    !     implicit none
+    subroutine copy_transform( from, to, xoffset, yoffset, zoffset )
+        implicit none
+        integer, intent(in) :: from, to
+        real(8), intent(in) :: xoffset, yoffset, zoffset
+        real(8)             :: rot(3, 3), offset(3), rot_offset(3)
 
-    ! end subroutine copy_translation
+        offset = (/ xoffset, yoffset, zoffset /)
+
+        rot(1, 1) = QW(from)**2 + QX(from)**2 - QY(from)**2 - QZ(from)**2
+        rot(1, 2) = 2.0 * ( QX(from) * QY(from) + QW(from) * QZ(from) )
+        rot(1, 3) = 2.0 * ( QX(from) * QZ(from) - QW(from) * QY(from) )
+        rot(2, 1) = 2.0 * ( QX(from) * QY(from) - QW(from) * QZ(from) )
+        rot(2, 2) = QW(from)**2 - QX(from)**2 + QY(from)**2 - QZ(from)**2
+        rot(2, 3) = 2.0 * ( QY(from) * QZ(from) + QW(from) * QX(from) )
+        rot(3, 1) = 2.0 * ( QX(from) * QZ(from) + QW(from) * QY(from) )
+        rot(3, 2) = 2.0 * ( QY(from) * QZ(from) - QW(from) * QX(from) )
+        rot(3, 3) = QW(from)**2 - QX(from)**2 - QY(from)**2 + QZ(from)**2
+
+        rot_offset(1) = rot(1, 1) * offset(1) + rot(1, 2) * offset(2) + rot(1, 3) * offset(3)
+        rot_offset(2) = rot(2, 1) * offset(1) + rot(2, 2) * offset(2) + rot(2, 3) * offset(3)
+        rot_offset(3) = rot(3, 1) * offset(1) + rot(3, 2) * offset(2) + rot(3, 3) * offset(3)
+
+        RX(to) = RX(from) + rot_offset(1)
+        RY(to) = RY(from) + rot_offset(2)
+        RZ(to) = RZ(from) + rot_offset(3)
+
+    end subroutine copy_transform
 
 end module system
