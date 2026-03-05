@@ -98,6 +98,7 @@ module lcg_random
 end module lcg_random
 
 module xmath
+    use iso_fortran_env, only: real64
     implicit none
     real, parameter :: pi = 3.1415926535897932384626433832795
     real, parameter :: e = 2.7182818284590452353602874713527
@@ -112,8 +113,8 @@ module xmath
 
     pure function mag(v) result (out)
         implicit none
-        real(8), intent(in), dimension(3) :: v
-        real(8) :: out
+        real(real64), intent(in), dimension(3) :: v
+        real(real64) :: out
 
         out = sqrt(sum(v**2))
 
@@ -121,8 +122,8 @@ module xmath
 
     pure function mag2(v) result (out)
         implicit none
-        real(8), intent(in), dimension(3) :: v
-        real(8) :: out
+        real(real64), intent(in), dimension(3) :: v
+        real(real64) :: out
 
         out = sum(v**2)
 
@@ -130,8 +131,8 @@ module xmath
 
     pure function normalize(v) result (out)
         implicit none
-        real(8), intent(in), dimension(3) :: v
-        real(8), dimension(size(v)) :: out
+        real(real64), intent(in), dimension(3) :: v
+        real(real64), dimension(size(v)) :: out
 
         out = v / mag(v)
 
@@ -139,8 +140,8 @@ module xmath
 
     pure function dot(v1, v2) result (out)
         implicit none
-        real(8), intent(in), dimension(3) :: v1, v2
-        real(8) :: out
+        real(real64), intent(in), dimension(3) :: v1, v2
+        real(real64) :: out
 
         out = sum(v1 * v2)
 
@@ -148,8 +149,8 @@ module xmath
 
     pure function cross(a, b) result (out)
         implicit none
-        real(8), intent(in), dimension(3) :: a, b
-        real(8), dimension(3) :: out
+        real(real64), intent(in), dimension(3) :: a, b
+        real(real64), dimension(3) :: out
 
         out(1) = a(2)*b(3) - a(3)*b(2)
         out(2) = a(3)*b(1) - a(1)*b(3)
@@ -159,8 +160,8 @@ module xmath
 
     pure function determinant(M) result (out)
         implicit none
-        real(8), intent(in), dimension(3,3) :: M
-        real(8) :: out
+        real(real64), intent(in), dimension(3,3) :: M
+        real(real64) :: out
 
         out = M(1, 1) * ( M(2, 2) * M(3, 3) - M(3, 2) * M(2, 3) ) &
             - M(1, 2) * ( M(2, 1) * M(3, 3) - M(3, 1) * M(2, 3) ) &
@@ -170,9 +171,9 @@ module xmath
 
     pure function inverse(M) result (out)
         implicit none
-        real(8), intent(in), dimension(3,3) :: M
-        real(8), dimension(3,3) :: out
-        real(8) :: det
+        real(real64), intent(in), dimension(3,3) :: M
+        real(real64), dimension(3,3) :: out
+        real(real64) :: det
 
         out(1, 1) = M(2, 2) * M(3, 3) - M(3, 2) * M(2, 3)
         out(1, 2) = M(1, 3) * M(3, 2) - M(1, 2) * M(3, 3)
@@ -193,8 +194,8 @@ module xmath
 
     pure function as_matrix( w, x, y, z ) result (out)
         implicit none
-        real(8), intent(in)     :: w, x, y, z
-        real(8), dimension(3,3) :: out
+        real(real64), intent(in)     :: w, x, y, z
+        real(real64), dimension(3,3) :: out
 
         out(1, 1) = 1 - 2 * y ** 2 - 2 * z ** 2
         out(1, 2) = 2 * x * y - 2 * w * z
@@ -211,7 +212,7 @@ module xmath
     end function as_matrix
 
     pure function rotation_matrix( w, x, y, z ) result (rot_matrix)
-        real(8), intent(in)   :: w, x, y, z
+        real(real64), intent(in)   :: w, x, y, z
         real, dimension(3, 3) :: rot_matrix
 
         rot_matrix(1, 1) = w ** 2 + x ** 2 - y ** 2 - z ** 2
@@ -228,8 +229,8 @@ module xmath
 
     pure function vvdot(a, b) result (out)
         implicit none
-        real(8), intent(in), dimension(3) :: a, b
-        real(8) :: out
+        real(real64), intent(in), dimension(3) :: a, b
+        real(real64) :: out
 
         out = sum(a * b)
 
@@ -237,9 +238,9 @@ module xmath
 
     pure function vmdot(a, b) result (out)
         implicit none
-        real(8), intent(in), dimension(3) :: a
-        real(8), intent(in), dimension(3, 3) :: b
-        real(8), dimension(3) :: out
+        real(real64), intent(in), dimension(3) :: a
+        real(real64), intent(in), dimension(3, 3) :: b
+        real(real64), dimension(3) :: out
 
         out(1) = sum(a(:) * b(:, 1))
         out(2) = sum(a(:) * b(:, 2))
@@ -249,9 +250,9 @@ module xmath
 
     pure function mvdot(a, b) result (out)
         implicit none
-        real(8), intent(in), dimension(3, 3) :: a
-        real(8), intent(in), dimension(3) :: b
-        real(8), dimension(3) :: out
+        real(real64), intent(in), dimension(3, 3) :: a
+        real(real64), intent(in), dimension(3) :: b
+        real(real64), dimension(3) :: out
 
         out(1) = sum(a(1, :) * b(:))
         out(2) = sum(a(2, :) * b(:))
@@ -260,8 +261,8 @@ module xmath
 
     pure function mmdot(a, b) result (out)
         implicit none
-        real(8), intent(in), dimension(3, 3) :: a, b
-        real(8), dimension(3, 3) :: out
+        real(real64), intent(in), dimension(3, 3) :: a, b
+        real(real64), dimension(3, 3) :: out
 
         out(1, 1) = sum(a(1, :) * b(:, 1))
         out(1, 2) = sum(a(1, :) * b(:, 2))
@@ -279,8 +280,8 @@ module xmath
 
     pure function quat_product(q1, q2) result (out)
         implicit none
-        real(8), dimension(4), intent(in) :: q1, q2
-        real(8), dimension(4)             :: out
+        real(real64), dimension(4), intent(in) :: q1, q2
+        real(real64), dimension(4)             :: out
 
         out(1) = q1(1) * q2(1) - q1(2) * q2(2) - q1(3) * q2(3) - q1(4) * q2(4)
         out(2) = q1(1) * q2(2) + q1(2) * q2(1) + q1(3) * q2(4) - q1(4) * q2(3)
@@ -291,8 +292,8 @@ module xmath
 
     pure function degrees_to_radians(angle) result (out)
         implicit none
-        real(8), intent(in) :: angle
-        real(8) :: out
+        real(real64), intent(in) :: angle
+        real(real64) :: out
 
         out = angle * pi / 180.0
 
@@ -300,8 +301,8 @@ module xmath
 
     pure function radians_to_degrees(angle) result (out)
         implicit none
-        real(8), intent(in) :: angle
-        real(8) :: out
+        real(real64), intent(in) :: angle
+        real(real64) :: out
 
         out = angle * 180.0 / pi
 
@@ -309,15 +310,15 @@ module xmath
 
     subroutine normal_distribution( rand )
         implicit none
-        real(8), intent(out) :: rand
-        real(8) :: sum_randnormal, dummy_randnormal, r_randnormal, r2_randnormal
+        real(real64), intent(out) :: rand
+        real(real64) :: sum_randnormal, dummy_randnormal, r_randnormal, r2_randnormal
         integer :: i_rnc
 
-        real(8), parameter :: A1 = 3.949846138
-        real(8), parameter :: A3 = 0.252408784
-        real(8), parameter :: A5 = 0.076542912
-        real(8), parameter :: A7 = 0.008355968
-        real(8), parameter :: A9 = 0.029899776
+        real(real64), parameter :: A1 = 3.949846138
+        real(real64), parameter :: A3 = 0.252408784
+        real(real64), parameter :: A5 = 0.076542912
+        real(real64), parameter :: A7 = 0.008355968
+        real(real64), parameter :: A9 = 0.029899776
 
         sum_randnormal = 0.0
 
@@ -336,8 +337,8 @@ module xmath
     subroutine normal_sequences( num, noise1, noise2 )
         implicit none
         integer, intent(in) :: num
-        real(8), dimension(num), intent(out) :: noise1, noise2
-        real(8), dimension(num) :: unf_noise1, unf_noise2
+        real(real64), dimension(num), intent(out) :: noise1, noise2
+        real(real64), dimension(num) :: unf_noise1, unf_noise2
 
         call random_number(unf_noise1)
         call random_number(unf_noise2)
@@ -349,9 +350,9 @@ module xmath
 
     PURE FUNCTION polyval ( x, c ) RESULT ( f )
         IMPLICIT NONE
-        REAL(8)                            :: f ! Returns polynomial in ...
-        REAL(8),                INTENT(in) :: x ! argument
-        REAL(8), DIMENSION(0:), INTENT(in) :: c ! given coefficients (ascending powers of x)
+        real(real64)                            :: f ! Returns polynomial in ...
+        real(real64),                INTENT(in) :: x ! argument
+        real(real64), DIMENSION(0:), INTENT(in) :: c ! given coefficients (ascending powers of x)
 
         ! Uses Horner's rule
         
@@ -366,8 +367,8 @@ module xmath
 
     PURE FUNCTION exprel ( x ) RESULT ( f )
         IMPLICIT NONE
-        REAL(8), INTENT(in) :: x ! Argument
-        REAL(8)             :: f ! Returns value of (exp(x)-1)/x
+        real(real64), INTENT(in) :: x ! Argument
+        real(real64)             :: f ! Returns value of (exp(x)-1)/x
 
         ! At small x, we must guard against the ratio of imprecise small values.
         ! There are various ways of doing this.
@@ -376,8 +377,8 @@ module xmath
         ! where the coefficient of x**(2n) is gn = 1/(2*n+1)!
         ! Alternatively, the exprel function is available in some math and scientific libraries.
 
-        REAL(8), DIMENSION(0:4), PARAMETER :: g = 1.0 / [1,6,120,5040,362880]
-        REAL(8),                 PARAMETER :: tol = 0.01
+        real(real64), DIMENSION(0:4), PARAMETER :: g = 1.0 / [1,6,120,5040,362880]
+        real(real64),                 PARAMETER :: tol = 0.01
 
         IF ( ABS(x) > tol ) THEN
         f = ( EXP(x) - 1.0 ) / x

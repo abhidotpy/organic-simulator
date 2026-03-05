@@ -174,7 +174,7 @@ module checkpoint_reporter
         implicit none
         integer, intent(in) :: unit
         integer :: I, J, na, nb, ia, ja
-        real(8) :: la, bx, by, bz
+        real(real64) :: la, bx, by, bz
         character(len=256) :: label
 
         read(unit, *) label, na
