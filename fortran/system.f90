@@ -1,28 +1,30 @@
 module atom
+    use iso_fortran_env, only: real64
     implicit none
 
-    real(8), allocatable, dimension(:) :: mass, charge
-    real(8), allocatable, dimension(:) :: shape_x, shape_y, shape_z, exc_rad
-    real(8), allocatable, dimension(:) :: eshape_x, eshape_y, eshape_z
-    real(8), allocatable, dimension(:) :: Ixx, Iyy, Izz
+    real(real64), allocatable, dimension(:) :: mass, charge
+    real(real64), allocatable, dimension(:) :: shape_x, shape_y, shape_z, exc_rad
+    real(real64), allocatable, dimension(:) :: eshape_x, eshape_y, eshape_z
+    real(real64), allocatable, dimension(:) :: Ixx, Iyy, Izz
     integer, allocatable, dimension(:) :: rtype
 
-    real(8), allocatable, dimension(:) :: RX, RY, RZ
-    real(8), allocatable, dimension(:) :: VX, VY, VZ
-    real(8), allocatable, dimension(:) :: FX, FY, FZ
+    real(real64), allocatable, dimension(:) :: RX, RY, RZ
+    real(real64), allocatable, dimension(:) :: VX, VY, VZ
+    real(real64), allocatable, dimension(:) :: FX, FY, FZ
 
-    real(8), allocatable, dimension(:) :: QW, QX, QY, QZ
-    real(8), allocatable, dimension(:) :: LX, LY, LZ
-    real(8), allocatable, dimension(:) :: TX, TY, TZ
+    real(real64), allocatable, dimension(:) :: QW, QX, QY, QZ
+    real(real64), allocatable, dimension(:) :: LX, LY, LZ
+    real(real64), allocatable, dimension(:) :: TX, TY, TZ
 
-    real(8), allocatable, dimension(:) :: RX_old, RY_old, RZ_old
+    real(real64), allocatable, dimension(:) :: RX_old, RY_old, RZ_old
 
 end module atom
 
 module box
+    use iso_fortran_env, only: real64
     implicit none
 
-    real(8) :: box_length(3), volume
+    real(real64) :: box_length(3), volume
     logical :: is_periodic
 
 end module box
@@ -35,12 +37,12 @@ module system
 
     integer :: N, NC, dof
     
-    real(8) :: potential_energy, kinetic_energy, total_energy
-    real(8) :: temperature, pressure, density, virial
-    real(8) :: target_temp, target_pres
+    real(real64) :: potential_energy, kinetic_energy, total_energy
+    real(real64) :: temperature, pressure, density, virial
+    real(real64) :: target_temp, target_pres
 
     integer, dimension(:), allocatable :: BBI, BBJ
-    real(8), dimension(:), allocatable :: BB_len
+    real(real64), dimension(:), allocatable :: BB_len
     
     logical :: default_mass_set     = .TRUE.
     logical :: default_charge_set   = .TRUE.
@@ -107,7 +109,7 @@ module system
 
     subroutine set_density( dens )
         implicit none
-        real(8), intent(in) :: dens
+        real(real64), intent(in) :: dens
 
         density_set = .TRUE.
         density = dens
@@ -133,7 +135,7 @@ module system
     subroutine set_atom_mass( id, atom_mass )
         implicit none
         integer, intent(in) :: id
-        real(8), intent(in) :: atom_mass
+        real(real64), intent(in) :: atom_mass
 
         if (num_atoms_set .eqv. .FALSE.) then
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
@@ -151,7 +153,7 @@ module system
     subroutine set_atom_charge( id, atom_charge )
         implicit none
         integer, intent(in) :: id
-        real(8), intent(in) :: atom_charge
+        real(real64), intent(in) :: atom_charge
 
         if (num_atoms_set .eqv. .FALSE.) then
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
@@ -168,8 +170,8 @@ module system
 
     subroutine set_box( length, width, height )
         implicit none
-        real(8), intent(in) :: length
-        real(8), optional, intent(in) :: width, height
+        real(real64), intent(in) :: length
+        real(real64), optional, intent(in) :: width, height
 
         box_lengths_set = .TRUE.
 
@@ -195,7 +197,7 @@ module system
 
     subroutine set_target_temperature( temp )
         implicit none
-        real(8), intent(in) :: temp
+        real(real64), intent(in) :: temp
 
         target_temp = temp
         target_temp_set = .TRUE.
@@ -204,7 +206,7 @@ module system
 
     subroutine set_target_pressure( pres )
         implicit none
-        real(8), intent(in) :: pres
+        real(real64), intent(in) :: pres
 
         target_pres = pres
         target_pres_set = .TRUE.
@@ -214,7 +216,7 @@ module system
     subroutine set_atom_shape( id, length, width, height )
         implicit none
         integer, intent(in) :: id
-        real(8), intent(in) :: length, width, height
+        real(real64), intent(in) :: length, width, height
 
         if (num_atoms_set .eqv. .FALSE.) then
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
@@ -242,7 +244,7 @@ module system
     subroutine set_atom_energy( id, eng_x, eng_y, eng_z )
         implicit none
         integer, intent(in) :: id
-        real(8), intent(in) :: eng_x, eng_y, eng_z
+        real(real64), intent(in) :: eng_x, eng_y, eng_z
 
         if (num_atoms_set .eqv. .FALSE.) then
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
@@ -264,7 +266,7 @@ module system
         implicit none
 
         integer, intent(in) :: id
-        real(8), intent(in) :: pos_x, pos_y, pos_z
+        real(real64), intent(in) :: pos_x, pos_y, pos_z
 
         if (num_atoms_set .eqv. .FALSE.) then
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
@@ -284,7 +286,7 @@ module system
         implicit none
 
         integer, intent(in) :: id
-        real(8), intent(in) :: vel_x, vel_y, vel_z
+        real(real64), intent(in) :: vel_x, vel_y, vel_z
 
         if (num_atoms_set .eqv. .FALSE.) then
             write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
@@ -304,7 +306,7 @@ module system
         implicit none
         integer, intent(in) :: id
         integer, intent(in) :: I, J
-        real(8), intent(in) :: length
+        real(real64), intent(in) :: length
 
         if (constraints_set .eqv. .FALSE.) then
             write(*, "(1x, 'Error: System has no constraints. Set number of constraints first.')")
@@ -323,10 +325,10 @@ module system
     subroutine set_velocty_to_temperature( rtemp )
         implicit none
 
-        real(8), intent(in) :: rtemp
-        real(8) :: target_velocity
-        real(8) :: vx_gen, vy_gen, vz_gen
-        real(8) :: vx_com, vy_com, vz_com
+        real(real64), intent(in) :: rtemp
+        real(real64) :: target_velocity
+        real(real64) :: vx_gen, vy_gen, vz_gen
+        real(real64) :: vx_com, vy_com, vz_com
         integer :: i
 
         if ( num_atoms_set .eqv. .FALSE. ) then
@@ -377,9 +379,9 @@ module system
     subroutine generate_fcc_lattice( unit_cells, dens )
         implicit none
         integer, intent(in) :: unit_cells
-        real(8), intent(in) :: dens
+        real(real64), intent(in) :: dens
         integer             :: num_atoms, mtemp, I, J, K, IREF
-        real(8)             :: cell, half_cell, rroot3
+        real(real64)             :: cell, half_cell, rroot3
 
         fcc_lattice_set = .TRUE.
         num_atoms = 4 * unit_cells ** 3
@@ -572,8 +574,8 @@ module system
     subroutine copy_transform( from, to, xoffset, yoffset, zoffset )
         implicit none
         integer, intent(in) :: from, to
-        real(8), intent(in) :: xoffset, yoffset, zoffset
-        real(8)             :: rot(3, 3), offset(3), rot_offset(3)
+        real(real64), intent(in) :: xoffset, yoffset, zoffset
+        real(real64)             :: rot(3, 3), offset(3), rot_offset(3)
 
         offset = (/ xoffset, yoffset, zoffset /)
 

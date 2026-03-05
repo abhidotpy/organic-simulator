@@ -3,16 +3,15 @@ module lennard_jones
     implicit none
 
     contains
-    pure subroutine lj_calculate_forces( I, J, cutoff, PE, FXIJ, eng)
+    pure subroutine lj_calculate_forces( I, J, cutoff, PE, FXIJ)
         implicit none
-        integer, intent(in)           :: I, J
-        real(8), intent(in)           :: cutoff
-        real(8), intent(out)          :: PE, FXIJ(3)
-        real(8), optional, intent(in) :: eng
+        integer, intent(in)         :: I, J
+        real(real64), intent(in)    :: cutoff
+        real(real64), intent(out)   :: PE, FXIJ(3)
 
-        real(8)                       :: RIJ(3), epsilon, sigma
-        real(8)                       :: rij_sq, rcut_sq, sr2_lj, coeff
-        real(8)                       :: pot, pot_cut, sr2_cut
+        real(real64)                :: RIJ(3), epsilon, sigma
+        real(real64)                :: rij_sq, rcut_sq, sr2_lj, coeff
+        real(real64)                :: pot, pot_cut, sr2_cut
 
         RIJ(1) = RX(I) - RX(J)
         RIJ(2) = RY(I) - RY(J)
@@ -22,12 +21,7 @@ module lennard_jones
             RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
         endif
 
-        if (present(eng)) then
-            epsilon = eng
-        else
-            epsilon = 1.0
-        endif
-
+        epsilon = sqrt( eshape_z(I) * eshape_z(J) )
         rij_sq = SUM( RIJ ** 2.0 )
         rcut_sq = cutoff ** 2.0
 
@@ -57,16 +51,15 @@ module lennard_jones12
     implicit none
 
     contains
-    pure subroutine lj12_calculate_forces( I, J, cutoff, PE, FXIJ, eng )
+    pure subroutine lj12_calculate_forces( I, J, cutoff, PE, FXIJ )
         implicit none
-        integer, intent(in)           :: I, J
-        real(8), intent(in)           :: cutoff
-        real(8), intent(out)          :: PE, FXIJ(3)
-        real(8), optional, intent(in) :: eng
+        integer, intent(in)        :: I, J
+        real(real64), intent(in)   :: cutoff
+        real(real64), intent(out)  :: PE, FXIJ(3)
 
-        real(8)                       :: RIJ(3), epsilon, sigma
-        real(8)                       :: rij_sq, rcut_sq, sr2_lj, coeff
-        real(8)                       :: pot, pot_cut, sr2_cut
+        real(real64)               :: RIJ(3), epsilon, sigma
+        real(real64)               :: rij_sq, rcut_sq, sr2_lj, coeff
+        real(real64)               :: pot, pot_cut, sr2_cut
 
 
         RIJ(1) = RX(I) - RX(J)
@@ -77,12 +70,7 @@ module lennard_jones12
             RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
         endif
 
-        if (present(eng)) then
-            epsilon = eng
-        else
-            epsilon = 1.0
-        endif
-
+        epsilon = sqrt( eshape_z(I) * eshape_z(J) )
         rij_sq = SUM( RIJ ** 2.0 )
         rcut_sq = cutoff ** 2.0
 
@@ -114,11 +102,11 @@ module wca
     contains
     pure subroutine wca_calculate_forces( I, J, PE, FXIJ )
         implicit none
-        integer, intent(in)           :: I, J
-        real(8), intent(out)          :: PE, FXIJ(3)
-        real(8), dimension(3)         :: RIJ, FIJ
-        real(8)                       :: rij_sq, sigma_sq, sr2_lj
-        real(8)                       :: coeff, pot
+        integer, intent(in)                :: I, J
+        real(real64), intent(out)          :: PE, FXIJ(3)
+        real(real64), dimension(3)         :: RIJ, FIJ
+        real(real64)                       :: rij_sq, sigma_sq, sr2_lj
+        real(real64)                       :: coeff, pot
 
 
         RIJ(1) = RX(I) - RX(J)
@@ -153,12 +141,12 @@ module morse
     contains
     pure subroutine morse_calculate_forces( I, J, dissoc, width, rmin, cutoff, PE, FXIJ )
         implicit none
-        integer, intent(in)   :: I, J
-        real(8), dimension(3) :: RIJ, FIJ
-        real(8), intent(in)   :: dissoc, width, rmin, cutoff
-        real(8), intent(out)  :: PE, FXIJ(3)
-        real(8)               :: rij_mag, exp_term
-        real(8)               :: exp_cut, pot, pot_cut
+        integer, intent(in)        :: I, J
+        real(real64), dimension(3) :: RIJ, FIJ
+        real(real64), intent(in)   :: dissoc, width, rmin, cutoff
+        real(real64), intent(out)  :: PE, FXIJ(3)
+        real(real64)               :: rij_mag, exp_term
+        real(real64)               :: exp_cut, pot, pot_cut
 
         RIJ(1) = RX(I) - RX(J)
         RIJ(2) = RY(I) - RY(J)
@@ -194,21 +182,21 @@ module gay_berne
     implicit none
     
     type :: gb_parameters
-        real(8) :: ru1, ru2, uu, chi, xhi
+        real(real64) :: ru1, ru2, uu, chi, xhi
     end type
     
     type :: gb_pair
-        real(8), dimension(3)   :: U1, U2, RIJ
-        real(8)                 :: rij_sq, rij_mag
+        real(real64), dimension(3)   :: U1, U2, RIJ
+        real(real64)                 :: rij_sq, rij_mag
     end type
 
     contains
     pure function g_func( chie, param, pair ) result (res)
         implicit none
-        real(8), intent(in)             :: chie
-        type(gb_parameters), intent(in) :: param
-        type(gb_pair), intent(in)       :: pair
-        real(8)                         :: term1, term2, res
+        real(real64), intent(in)             :: chie
+        type(gb_parameters), intent(in)      :: param
+        type(gb_pair), intent(in)            :: pair
+        real(real64)                         :: term1, term2, res
 
         term1 = (param % ru1 + param % ru2)**2 / (1 + chie * param % uu)
         term2 = (param % ru1 - param % ru2)**2 / (1 - chie * param % uu)
@@ -219,10 +207,10 @@ module gay_berne
 
     pure function dG_dr( chie, param, pair ) result (res)
         implicit none
-        real(8), intent(in)             :: chie
+        real(real64), intent(in)             :: chie
         type(gb_parameters), intent(in) :: param
         type(gb_pair), intent(in)       :: pair
-        real(8), dimension(3)           :: term1, term2, res
+        real(real64), dimension(3)           :: term1, term2, res
 
         term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu)) * (pair % U1 + pair % U2)
         term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu)) * (pair % U1 - pair % U2)
@@ -233,10 +221,10 @@ module gay_berne
 
     pure function dG_du1( chie, param, pair ) result(res)
         implicit none
-        real(8), intent(in)             :: chie
+        real(real64), intent(in)             :: chie
         type(gb_parameters), intent(in) :: param
         type(gb_pair), intent(in)       :: pair
-        real(8)                         :: term1, term2, res(3)
+        real(real64)                         :: term1, term2, res(3)
         
         term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu))
         term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu))
@@ -247,10 +235,10 @@ module gay_berne
 
     pure function dG_du2( chie, param, pair ) result(res)
         implicit none
-        real(8), intent(in)             :: chie
+        real(real64), intent(in)             :: chie
         type(gb_parameters), intent(in) :: param
         type(gb_pair), intent(in)       :: pair
-        real(8)                         :: term1, term2, res(3)
+        real(real64)                         :: term1, term2, res(3)
         
         term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu))
         term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu))
@@ -262,21 +250,21 @@ module gay_berne
     pure subroutine gb_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width )
         implicit none
         integer, intent(in)             :: I, J
-        real(8), intent(in)             :: cutoff
-        real(8), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
-        real(8), optional, intent(in)   :: width
+        real(real64), intent(in)             :: cutoff
+        real(real64), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
+        real(real64), optional, intent(in)   :: width
         
         type(gb_parameters) :: param
         type(gb_pair)       :: pair
         
-        real(8), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2
-        real(8), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
-        real(8), dimension(3)           :: FIJ, TI, TJ, TORQ1, TORQ2
+        real(real64), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2
+        real(real64), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
+        real(real64), dimension(3)           :: FIJ, TI, TJ, TORQ1, TORQ2
 
-        real(8)                         :: meu, neu
-        real(8)                         :: eps1, eps2, sr, sr_cut, sigma, sigma_0
-        real(8)                         :: pot, wf, srx_fac, srd_fac
-        real(8)                         :: switch, xx, sx, sdx, factor
+        real(real64)                         :: meu, neu
+        real(real64)                         :: eps1, eps2, sr, sr_cut, sigma, sigma_0
+        real(real64)                         :: pot, wf, srx_fac, srd_fac
+        real(real64)                         :: switch, xx, sx, sdx, factor
         logical                         :: imp_wat
 
         meu = 1.0; neu = 2.0; sigma_0 = 1.0; imp_wat = .FALSE.
@@ -389,27 +377,27 @@ module ecp
     implicit none
 
     type :: ecp_pair
-        real(8), dimension(3, 3) :: AE, BE, AR, BR
-        real(8), dimension(3)    :: RIJ, RIJ_hat
-        real(8)                  :: RIJ_SQ, RIJ_MAG
+        real(real64), dimension(3, 3) :: AE, BE, AR, BR
+        real(real64), dimension(3)    :: RIJ, RIJ_hat
+        real(real64)                  :: RIJ_SQ, RIJ_MAG
     end type
 
     contains
-    pure real(8) function brent(func, pair) result (res)
+    pure real(real64) function brent(func, pair) result (res)
         implicit none
-        type(ecp_pair), intent(in) :: pair
-        integer, parameter :: max_iter = 10000
-        real(8), parameter :: eps = 1e-8, psi = 0.5 * ( 3.0 - sqrt(5.0) )
-        real(8)            :: a, b, c, x, w, v, u
-        real(8)            :: fa, fb, fc, ft, fw, fv, fu
-        real(8)            :: deltax, atol, rtol
-        real(8)            :: tol1, tol2, xmid, tmp1, tmp2, rat, p, dx_temp
-        integer            :: I, iter
+        type(ecp_pair), intent(in)  :: pair
+        integer, parameter          :: max_iter = 10000
+        real(real64), parameter     :: eps = 1e-8, psi = 0.5 * ( 3.0 - sqrt(5.0) )
+        real(real64)                :: a, b, c, x, w, v, u
+        real(real64)                :: fa, fb, fc, ft, fw, fv, fu
+        real(real64)                :: deltax, atol, rtol
+        real(real64)                :: tol1, tol2, xmid, tmp1, tmp2, rat, p, dx_temp
+        integer                     :: I, iter
 
         interface
-            pure real(8) function func(xx, pp)
-                import ecp_pair
-                real(8), intent(in)        :: xx
+            pure real(real64) function func(xx, pp)
+                import ecp_pair, real64
+                real(real64), intent(in)        :: xx
                 type(ecp_pair), intent(in) :: pp
             end function func
         end interface
@@ -523,12 +511,12 @@ module ecp
         res = x
     end function brent
 
-    pure real(8) function optim_eps( L, pair )
+    pure real(real64) function optim_eps( L, pair )
         implicit none
-        real(8), intent(in)         :: L
+        real(real64), intent(in)         :: L
         type(ecp_pair), intent(in)  :: pair
-        real(8), dimension(3, 3)    :: GM
-        real(8), dimension(3)       :: KM
+        real(real64), dimension(3, 3)    :: GM
+        real(real64), dimension(3)       :: KM
 
         GM = ( 1 - L ) * pair % AE + L * pair % BE
         KM = inverse(GM) .x. pair % RIJ
@@ -537,12 +525,12 @@ module ecp
         
     end function optim_eps
 
-    pure real(8) function optim_dist( L, pair )
+    pure real(real64) function optim_dist( L, pair )
         implicit none
-        real(8), intent(in)         :: L
+        real(real64), intent(in)         :: L
         type(ecp_pair), intent(in)  :: pair
-        real(8), dimension(3, 3)    :: GM_R
-        real(8), dimension(3)       :: KM_R
+        real(real64), dimension(3, 3)    :: GM_R
+        real(real64), dimension(3)       :: KM_R
 
         GM_R = ( 1 - L ) * pair % AR + L * pair % BR
         KM_R = inverse(GM_R) .x. pair % RIJ
@@ -554,27 +542,27 @@ module ecp
     pure subroutine ecp_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width )
         implicit none
         integer, intent(in)             :: I, J
-        real(8), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
-        real(8), intent(in)             :: cutoff
-        real(8), optional, intent(in)   :: width
+        real(real64), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
+        real(real64), intent(in)             :: cutoff
+        real(real64), optional, intent(in)   :: width
 
         type(ecp_pair) :: pair
 
-        real(8), dimension(3, 3) :: U1, U2, S1, S2, E1, E2, EM
-        real(8), dimension(3, 3) :: GE, GR, MM1, MM2
-        real(8), dimension(3)    :: KE, KR
-        real(8)                  :: lambda_E, lambda_R
-        real(8)                  :: meu, neu
+        real(real64), dimension(3, 3) :: U1, U2, S1, S2, E1, E2, EM
+        real(real64), dimension(3, 3) :: GE, GR, MM1, MM2
+        real(real64), dimension(3)    :: KE, KR
+        real(real64)                  :: lambda_E, lambda_R
+        real(real64)                  :: meu, neu
 
-        real(8), dimension(3)    :: dR_dr, de2_dr
-        real(8), dimension(3)    :: de1_du1x, de1_du1y, de1_du1z, de1_du1, de2_du1, dR_du1
-        real(8), dimension(3)    :: de1_du2x, de1_du2y, de1_du2z, de1_du2, de2_du2, dR_du2
-        real(8), dimension(3)    :: FIJ, TORQ1, TORQ2
+        real(real64), dimension(3)    :: dR_dr, de2_dr
+        real(real64), dimension(3)    :: de1_du1x, de1_du1y, de1_du1z, de1_du1, de2_du1, dR_du1
+        real(real64), dimension(3)    :: de1_du2x, de1_du2y, de1_du2z, de1_du2, de2_du2, dR_du2
+        real(real64), dimension(3)    :: FIJ, TORQ1, TORQ2
 
-        real(8)                  :: eps1, eps2, sr, phi, sigma, sigma_0
-        real(8)                  :: e10, e20, sigma_t1, sigma_t2, sigma_t
-        real(8)                  :: pot, wf, efac, rfac, srx_fac, srd_fac
-        real(8)                  :: switch, xx, sx, sdx, factor
+        real(real64)                  :: eps1, eps2, sr, phi, sigma, sigma_0
+        real(real64)                  :: e10, e20, sigma_t1, sigma_t2, sigma_t
+        real(real64)                  :: pot, wf, efac, rfac, srx_fac, srd_fac
+        real(real64)                  :: switch, xx, sx, sdx, factor
         logical                  :: imp_wat, ierr_e, ierr_r
 
         meu = 1.0; neu = 2.0; sigma_0 = 1.0; 
@@ -748,21 +736,21 @@ module gay_berne_chiral
     implicit none
     
     type :: gb_parameters
-        real(8) :: ru1, ru2, uu, chi, xhi
+        real(real64) :: ru1, ru2, uu, chi, xhi
     end type
     
     type :: gb_pair
-        real(8), dimension(3)   :: U1, U2, RIJ, RIJ_hat
-        real(8)                 :: rij_sq, rij_mag
+        real(real64), dimension(3)   :: U1, U2, RIJ, RIJ_hat
+        real(real64)                 :: rij_sq, rij_mag
     end type
 
     contains
     pure function g_func( chie, param, pair ) result (res)
         implicit none
-        real(8), intent(in)             :: chie
-        type(gb_parameters), intent(in) :: param
-        type(gb_pair), intent(in)       :: pair
-        real(8)                         :: term1, term2, res
+        real(real64), intent(in)            :: chie
+        type(gb_parameters), intent(in)     :: param
+        type(gb_pair), intent(in)           :: pair
+        real(real64)                        :: term1, term2, res
 
         term1 = (param % ru1 + param % ru2)**2 / (1 + chie * param % uu)
         term2 = (param % ru1 - param % ru2)**2 / (1 - chie * param % uu)
@@ -773,10 +761,10 @@ module gay_berne_chiral
 
     pure function dG_dr( chie, param, pair ) result (res)
         implicit none
-        real(8), intent(in)             :: chie
+        real(real64), intent(in)             :: chie
         type(gb_parameters), intent(in) :: param
         type(gb_pair), intent(in)       :: pair
-        real(8), dimension(3)           :: term1, term2, res
+        real(real64), dimension(3)           :: term1, term2, res
 
         term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu)) * (pair % U1 + pair % U2)
         term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu)) * (pair % U1 - pair % U2)
@@ -787,10 +775,10 @@ module gay_berne_chiral
 
     pure function dG_du1( chie, param, pair ) result(res)
         implicit none
-        real(8), intent(in)             :: chie
+        real(real64), intent(in)             :: chie
         type(gb_parameters), intent(in) :: param
         type(gb_pair), intent(in)       :: pair
-        real(8)                         :: term1, term2, res(3)
+        real(real64)                         :: term1, term2, res(3)
         
         term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu))
         term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu))
@@ -801,10 +789,10 @@ module gay_berne_chiral
 
     pure function dG_du2( chie, param, pair ) result(res)
         implicit none
-        real(8), intent(in)             :: chie
+        real(real64), intent(in)             :: chie
         type(gb_parameters), intent(in) :: param
         type(gb_pair), intent(in)       :: pair
-        real(8)                         :: term1, term2, res(3)
+        real(real64)                         :: term1, term2, res(3)
         
         term1 = ((param % ru1 + param % ru2) / (1 + chie * param % uu))
         term2 = ((param % ru1 - param % ru2) / (1 - chie * param % uu))
@@ -816,23 +804,23 @@ module gay_berne_chiral
     pure subroutine gbc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality )
         implicit none
         integer, intent(in)             :: I, J
-        real(8), intent(in)             :: cutoff
-        real(8), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
-        real(8), optional, intent(in)   :: width, chirality
+        real(real64), intent(in)             :: cutoff
+        real(real64), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
+        real(real64), optional, intent(in)   :: width, chirality
         
         type(gb_parameters)             :: param
         type(gb_pair)                   :: pair
         
-        real(8), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2, U1XU2
-        real(8), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
-        real(8), dimension(3)           :: duur_dr, duur_du1, duur_du2, duu_du1, duu_du2
-        real(8), dimension(3)           :: FIJ, TI, TJ, TORQ1, TORQ2
-        real(8), dimension(3)           :: FIJ_chiral, TI_chiral, TJ_chiral, TORQ1_chiral, TORQ2_chiral
+        real(real64), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2, U1XU2
+        real(real64), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
+        real(real64), dimension(3)           :: duur_dr, duur_du1, duur_du2, duu_du1, duu_du2
+        real(real64), dimension(3)           :: FIJ, TI, TJ, TORQ1, TORQ2
+        real(real64), dimension(3)           :: FIJ_chiral, TI_chiral, TJ_chiral, TORQ1_chiral, TORQ2_chiral
 
-        real(8)                         :: meu, neu, uur, uu
-        real(8)                         :: eps1, eps2, sr, sr_cut, sigma, sigma_0
-        real(8)                         :: pot, pot_chiral, wf, ch_str
-        real(8)                         :: switch, xx, sx, sdx, factor, srx_fac, srd_fac
+        real(real64)                         :: meu, neu, uur, uu
+        real(real64)                         :: eps1, eps2, sr, sr_cut, sigma, sigma_0
+        real(real64)                         :: pot, pot_chiral, wf, ch_str
+        real(real64)                         :: switch, xx, sx, sdx, factor, srx_fac, srd_fac
         logical                         :: imp_wat
 
         meu = 1.0; neu = 2.0; sigma_0 = 1.0; imp_wat = .FALSE.
@@ -990,27 +978,27 @@ module ecp_chiral
     implicit none
 
     type :: ecp_pair
-        real(8), dimension(3, 3) :: AE, BE, AR, BR
-        real(8), dimension(3)    :: RIJ, RIJ_hat
-        real(8)                  :: RIJ_SQ, RIJ_MAG
+        real(real64), dimension(3, 3) :: AE, BE, AR, BR
+        real(real64), dimension(3)    :: RIJ, RIJ_hat
+        real(real64)                  :: RIJ_SQ, RIJ_MAG
     end type
 
     contains
-    pure real(8) function brent(func, pair) result (res)
+    pure real(real64) function brent(func, pair) result (res)
         implicit none
-        type(ecp_pair), intent(in) :: pair
-        integer, parameter :: max_iter = 10000
-        real(8), parameter :: eps = 1e-8, psi = 0.5 * ( 3.0 - sqrt(5.0) )
-        real(8)            :: a, b, c, x, w, v, u
-        real(8)            :: fa, fb, fc, ft, fw, fv, fu
-        real(8)            :: deltax, atol, rtol
-        real(8)            :: tol1, tol2, xmid, tmp1, tmp2, rat, p, dx_temp
-        integer            :: I, iter
+        type(ecp_pair), intent(in)  :: pair
+        integer, parameter          :: max_iter = 10000
+        real(real64), parameter     :: eps = 1e-8, psi = 0.5 * ( 3.0 - sqrt(5.0) )
+        real(real64)                :: a, b, c, x, w, v, u
+        real(real64)                :: fa, fb, fc, ft, fw, fv, fu
+        real(real64)                :: deltax, atol, rtol
+        real(real64)                :: tol1, tol2, xmid, tmp1, tmp2, rat, p, dx_temp
+        integer                     :: I, iter
 
         interface
-            pure real(8) function func(xx, pp)
-                import ecp_pair
-                real(8), intent(in)        :: xx
+            pure real(real64) function func(xx, pp)
+                import ecp_pair, real64
+                real(real64), intent(in)        :: xx
                 type(ecp_pair), intent(in) :: pp
             end function func
         end interface
@@ -1124,12 +1112,12 @@ module ecp_chiral
         res = x
     end function brent
 
-    pure real(8) function optim_eps( L, pair )
+    pure real(real64) function optim_eps( L, pair )
         implicit none
-        real(8), intent(in)         :: L
+        real(real64), intent(in)         :: L
         type(ecp_pair), intent(in)  :: pair
-        real(8), dimension(3, 3)    :: GM
-        real(8), dimension(3)       :: KM
+        real(real64), dimension(3, 3)    :: GM
+        real(real64), dimension(3)       :: KM
 
         GM = ( 1 - L ) * pair % AE + L * pair % BE
         KM = inverse(GM) .x. pair % RIJ
@@ -1138,12 +1126,12 @@ module ecp_chiral
         
     end function optim_eps
 
-    pure real(8) function optim_dist( L, pair )
+    pure real(real64) function optim_dist( L, pair )
         implicit none
-        real(8), intent(in)         :: L
+        real(real64), intent(in)         :: L
         type(ecp_pair), intent(in)  :: pair
-        real(8), dimension(3, 3)    :: GM_R
-        real(8), dimension(3)       :: KM_R
+        real(real64), dimension(3, 3)    :: GM_R
+        real(real64), dimension(3)       :: KM_R
 
         GM_R = ( 1 - L ) * pair % AR + L * pair % BR
         KM_R = inverse(GM_R) .x. pair % RIJ
@@ -1155,31 +1143,31 @@ module ecp_chiral
     pure subroutine ecpc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality )
         implicit none
         integer, intent(in)             :: I, J
-        real(8), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
-        real(8), intent(in)             :: cutoff
-        real(8), optional, intent(in)   :: width, chirality
+        real(real64), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
+        real(real64), intent(in)             :: cutoff
+        real(real64), optional, intent(in)   :: width, chirality
 
         type(ecp_pair) :: pair
 
-        real(8), dimension(3, 3) :: U1, U2, S1, S2, E1, E2, EM
-        real(8), dimension(3, 3) :: GE, GR, MM1, MM2
-        real(8), dimension(3)    :: KE, KR, U1XU2
-        real(8)                  :: lambda_E, lambda_R
-        real(8)                  :: meu, neu, uur, uu
+        real(real64), dimension(3, 3) :: U1, U2, S1, S2, E1, E2, EM
+        real(real64), dimension(3, 3) :: GE, GR, MM1, MM2
+        real(real64), dimension(3)    :: KE, KR, U1XU2
+        real(real64)                  :: lambda_E, lambda_R
+        real(real64)                  :: meu, neu, uur, uu
 
-        real(8), dimension(3)    :: dR_dr, de2_dr
-        real(8), dimension(3)    :: de1_du1x, de1_du1y, de1_du1z, de1_du1, de2_du1, dR_du1
-        real(8), dimension(3)    :: de1_du2x, de1_du2y, de1_du2z, de1_du2, de2_du2, dR_du2
-        real(8), dimension(3)    :: duur_dr, duur_du1z, duur_du2z, duur_du1, duur_du2
-        real(8), dimension(3)    :: duu_du1z, duu_du2z, duu_du1, duu_du2
-        real(8), dimension(3)    :: FIJ, TORQ1, TORQ2
-        real(8), dimension(3)    :: FIJ_chiral, TORQ1_chiral, TORQ2_chiral
+        real(real64), dimension(3)    :: dR_dr, de2_dr
+        real(real64), dimension(3)    :: de1_du1x, de1_du1y, de1_du1z, de1_du1, de2_du1, dR_du1
+        real(real64), dimension(3)    :: de1_du2x, de1_du2y, de1_du2z, de1_du2, de2_du2, dR_du2
+        real(real64), dimension(3)    :: duur_dr, duur_du1z, duur_du2z, duur_du1, duur_du2
+        real(real64), dimension(3)    :: duu_du1z, duu_du2z, duu_du1, duu_du2
+        real(real64), dimension(3)    :: FIJ, TORQ1, TORQ2
+        real(real64), dimension(3)    :: FIJ_chiral, TORQ1_chiral, TORQ2_chiral
 
-        real(8)                  :: eps1, eps2, sr, phi, sigma, sigma_0, ch_str
-        real(8)                  :: e10, e20, sigma_t1, sigma_t2, sigma_t
-        real(8)                  :: pot, wf, efac, rfac, srx_fac, srd_fac
-        real(8)                  :: switch, xx, sx, sdx, factor, pot_chiral
-        logical                  :: imp_wat, ierr_e, ierr_r
+        real(real64)                  :: eps1, eps2, sr, phi, sigma, sigma_0, ch_str
+        real(real64)                  :: e10, e20, sigma_t1, sigma_t2, sigma_t
+        real(real64)                  :: pot, wf, efac, rfac, srx_fac, srd_fac
+        real(real64)                  :: switch, xx, sx, sdx, factor, pot_chiral
+        logical                       :: imp_wat, ierr_e, ierr_r
 
         meu = 1.0; neu = 2.0; sigma_0 = 1.0; 
         imp_wat = .FALSE.; ierr_e = .FALSE.; ierr_r = .FALSE.
@@ -1403,11 +1391,11 @@ module bonded_interactions
     contains
     subroutine bend_calculate_forces( I, J, K, coeff )
         implicit none
-        integer, intent(in) :: I, J, K
-        real(8), intent(in) :: coeff
-        real(8) :: VI(3), VJ(3), FI(3), FJ(3), FK(3)
-        real(8) :: CC11, CC12, CC22
-        real(8) :: prefac, fac, fac1, fac2, pot
+        integer, intent(in)         :: I, J, K
+        real(real64), intent(in)    :: coeff
+        real(real64)                :: VI(3), VJ(3), FI(3), FJ(3), FK(3)
+        real(real64)                :: CC11, CC12, CC22
+        real(real64)                :: prefac, fac, fac1, fac2, pot
 
         VI(1) = RX(J) - RX(I)
         VI(2) = RY(J) - RY(I)
@@ -1455,13 +1443,13 @@ module bonded_interactions
 
     subroutine dih_calculate_forces( I, J, K, L, coeff )
         implicit none
-        integer, intent(in) :: I, J, K, L
-        real(8), intent(in) :: coeff
-        real(8) :: VI(3), VJ(3), VK(3), FI(3), FJ(3), FK(3), FL(3)
-        real(8) :: CC11, CC12, CC13, CC22, CC23, CC33
-        real(8) :: DD11, DD12, DD13, DD22, DD23, DD33
-        real(8) :: prefac, fac, fac1, fac2, fac3
-        real(8) :: pot
+        integer, intent(in)         :: I, J, K, L
+        real(real64), intent(in)    :: coeff
+        real(real64)                :: VI(3), VJ(3), VK(3), FI(3), FJ(3), FK(3), FL(3)
+        real(real64)                :: CC11, CC12, CC13, CC22, CC23, CC33
+        real(real64)                :: DD11, DD12, DD13, DD22, DD23, DD33
+        real(real64)                :: prefac, fac, fac1, fac2, fac3
+        real(real64)                :: pot
 
         VI(1) = RX(J) - RX(I)
         VI(2) = RY(J) - RY(I)
@@ -1534,11 +1522,11 @@ module bonded_interactions
 
     subroutine angle_bend_calculate_forces( I, J, K, coeff, ang )
         implicit none
-        integer, intent(in) :: I, J, K
-        real(8), intent(in) :: coeff, ang
-        real(8) :: VI(3), VJ(3), FI(3), FJ(3), FK(3)
-        real(8) :: CC11, CC12, CC22
-        real(8) :: prefac, fac, fac1, fac2, pot
+        integer, intent(in)         :: I, J, K
+        real(real64), intent(in)    :: coeff, ang
+        real(real64)                :: VI(3), VJ(3), FI(3), FJ(3), FK(3)
+        real(real64)                :: CC11, CC12, CC22
+        real(real64)                :: prefac, fac, fac1, fac2, pot
 
         VI(1) = RX(J) - RX(I)
         VI(2) = RY(J) - RY(I)
@@ -1588,11 +1576,11 @@ module constraints
     contains
     subroutine apply_constraints_a( DT )
         implicit none
-        real(8), intent(in) :: DT
-        real(8) :: RIJ(3), RIJ_old(3), DR(3)   
-        real(8) :: L_ij, chi, vdot, r_tol, len
-        integer :: I, J, IX, rattle, max_rattle = 100
-        logical :: moved(N)
+        real(real64), intent(in)    :: DT
+        real(real64)                :: RIJ(3), RIJ_old(3), DR(3)   
+        real(real64)                :: L_ij, chi, vdot, r_tol, len
+        integer                     :: I, J, IX, rattle, max_rattle = 100
+        logical                     :: moved(N)
 
         L_ij = 0.0; rattle = 0; 
         r_tol = 1.0e-5; max_rattle = 100
@@ -1673,11 +1661,11 @@ module constraints
 
     subroutine apply_constraints_b( DT )
         implicit none
-        real(8), intent(in) :: DT
-        real(8) :: RIJ(3), VIJ(3), DV(3)   
-        real(8) :: L_ij, chi, vdot, r_tol, len
-        integer :: I, J, IX, rattle, max_rattle = 100
-        logical :: moved(N)
+        real(real64), intent(in)    :: DT
+        real(real64)                :: RIJ(3), VIJ(3), DV(3)   
+        real(real64)                :: L_ij, chi, vdot, r_tol, len
+        integer                     :: I, J, IX, rattle, max_rattle = 100
+        logical                     :: moved(N)
 
         L_ij = 0.0; rattle = 0; 
         r_tol = 1.0e-5; max_rattle = 100
