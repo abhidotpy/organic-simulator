@@ -26,7 +26,7 @@ module lennard_jones
         rcut_sq = cutoff ** 2.0
 
         if (rij_sq < rcut_sq) then
-            sigma = ( exc_rad(I) + exc_rad(J) ) / 2.0
+            sigma = ( shape_z(I) + shape_z(J) ) / 2.0
             sr2_lj = ( sigma ** 2.0 ) / rij_sq
             sr2_cut = ( sigma ** 2.0 ) / rcut_sq
 
@@ -75,7 +75,7 @@ module lennard_jones12
         rcut_sq = cutoff ** 2.0
 
         if (rij_sq < rcut_sq) then
-            sigma = ( exc_rad(I) + exc_rad(J) ) / 2.0
+            sigma = ( shape_z(I) + shape_z(J) ) / 2.0
             sr2_lj = ( sigma ** 2.0 ) / rij_sq
             sr2_cut = ( sigma ** 2.0 ) / rcut_sq
 
@@ -100,13 +100,14 @@ module wca
     implicit none
 
     contains
-    pure subroutine wca_calculate_forces( I, J, PE, FXIJ )
+    pure subroutine wca_calculate_forces( I, J, cutoff, PE, FXIJ )
         implicit none
-        integer, intent(in)                :: I, J
-        real(real64), intent(out)          :: PE, FXIJ(3)
-        real(real64), dimension(3)         :: RIJ, FIJ
-        real(real64)                       :: rij_sq, sigma_sq, sr2_lj
-        real(real64)                       :: coeff, pot
+        integer, intent(in)             :: I, J
+        real(real64), intent(in)        :: cutoff
+        real(real64), intent(out)       :: PE, FXIJ(3)
+        real(real64), dimension(3)      :: RIJ, FIJ
+        real(real64)                    :: rij_sq, rcut_sq, sigma_sq, sr2_lj
+        real(real64)                    :: coeff, pot
 
 
         RIJ(1) = RX(I) - RX(J)
@@ -118,16 +119,20 @@ module wca
         endif
 
         rij_sq = SUM( RIJ ** 2.0 )
-        sigma_sq = ( (shape_z(I) + shape_z(J)) / 2.0 ) ** 2.0
-        sr2_lj = sigma_sq / rij_sq
+        rcut_sq = cutoff ** 2.0
 
-        if ( rij_sq <= sigma_sq ) then
-            PE = ( sr2_lj**6.0 - 2.0*sr2_lj**3.0 )
-            coeff = 12.0 * (sr2_lj**6 - sr2_lj**3)
-            FXIJ = coeff * RIJ / rij_sq
-        else
-            PE = 0.0
-            FXIJ = 0.0
+        if (rij_sq < rcut_sq) then
+            sigma_sq = ( (shape_z(I) + shape_z(J)) / 2.0 ) ** 2.0
+            sr2_lj = sigma_sq / rij_sq
+
+            if ( rij_sq <= sigma_sq ) then
+                PE = sigma_sq * (( sr2_lj**6.0 - 2.0*sr2_lj**3.0 ) + 1.0)
+                coeff = 12.0 * sigma_sq * (sr2_lj**6 - sr2_lj**3)
+                FXIJ = coeff * RIJ / rij_sq
+            else
+                PE = 0.0
+                FXIJ = 0.0
+            endif
         endif
 
     end subroutine wca_calculate_forces
@@ -1579,6 +1584,7 @@ module constraints
         real(real64), intent(in)    :: DT
         real(real64)                :: RIJ(3), RIJ_old(3), DR(3)   
         real(real64)                :: L_ij, chi, vdot, r_tol, len
+        real(real64)                :: inv_mass_a, inv_mass_b
         integer                     :: I, J, IX, rattle, max_rattle = 100
         logical                     :: moved(N)
 
@@ -1592,6 +1598,9 @@ module constraints
                 I   = BBI(IX)
                 J   = BBJ(IX)
                 len = BB_len(IX)
+
+                inv_mass_a = 1.0 / mass(I)
+                inv_mass_b = 1.0 / mass(J)
                 
                 if ( moved(I) .or. moved(J) ) then
 
@@ -1603,7 +1612,7 @@ module constraints
                         RIJ = RIJ - ANINT( RIJ / box_length ) * box_length
                     endif
 
-                    chi = len ** 2 - SUM( RIJ ** 2)
+                    chi = len ** 2 - SUM( RIJ ** 2 )
 
                     if (abs(chi) > 2 * r_tol * len**2.0) then 
 
@@ -1623,24 +1632,25 @@ module constraints
                             stop
                         endif
 
-                        L_ij = chi / ( 4.0 * vdot )
-                        DR = L_ij * rij_old
+                        L_ij = chi / ( 2.0 * vdot * ( inv_mass_a + inv_mass_b ) )
 
-                        RX(I) = RX(I) + DR(1)
-                        RY(I) = RY(I) + DR(2)
-                        RZ(I) = RZ(I) + DR(3)
+                        virial = virial + ( L_ij * len ** 2 ) / DT ** 2
 
-                        RX(J) = RX(J) - DR(1)
-                        RY(J) = RY(J) - DR(2)
-                        RZ(J) = RZ(J) - DR(3)
+                        RX(I) = RX(I) + ( L_ij * inv_mass_a ) * RIJ_old(1)
+                        RY(I) = RY(I) + ( L_ij * inv_mass_a ) * RIJ_old(2)
+                        RZ(I) = RZ(I) + ( L_ij * inv_mass_a ) * RIJ_old(3)
 
-                        VX(I) = VX(I) + DR(1) / DT
-                        VY(I) = VY(I) + DR(2) / DT
-                        VZ(I) = VZ(I) + DR(3) / DT
+                        RX(J) = RX(J) - ( L_ij * inv_mass_b ) * RIJ_old(1)
+                        RY(J) = RY(J) - ( L_ij * inv_mass_b ) * RIJ_old(2)
+                        RZ(J) = RZ(J) - ( L_ij * inv_mass_b ) * RIJ_old(3)
 
-                        VX(J) = VX(J) - DR(1) / DT
-                        VY(J) = VY(J) - DR(2) / DT
-                        VZ(J) = VZ(J) - DR(3) / DT
+                        VX(I) = VX(I) + ( L_ij * inv_mass_a ) * RIJ_old(1) / DT
+                        VY(I) = VY(I) + ( L_ij * inv_mass_a ) * RIJ_old(2) / DT
+                        VZ(I) = VZ(I) + ( L_ij * inv_mass_a ) * RIJ_old(3) / DT
+
+                        VX(J) = VX(J) - ( L_ij * inv_mass_b ) * RIJ_old(1) / DT
+                        VY(J) = VY(J) - ( L_ij * inv_mass_b ) * RIJ_old(2) / DT
+                        VZ(J) = VZ(J) - ( L_ij * inv_mass_b ) * RIJ_old(3) / DT
 
                         moved(i) = .TRUE.
                         moved(j) = .TRUE.
@@ -1662,8 +1672,9 @@ module constraints
     subroutine apply_constraints_b( DT )
         implicit none
         real(real64), intent(in)    :: DT
-        real(real64)                :: RIJ(3), VIJ(3), DV(3)   
+        real(real64)                :: RIJ(3), VIJ(3)
         real(real64)                :: L_ij, chi, vdot, r_tol, len
+        real(real64)                :: inv_mass_a, inv_mass_b
         integer                     :: I, J, IX, rattle, max_rattle = 100
         logical                     :: moved(N)
 
@@ -1677,6 +1688,9 @@ module constraints
                 I   = BBI(IX)
                 J   = BBJ(IX)
                 len = BB_len(IX)
+
+                inv_mass_a = 1.0 / mass(I)
+                inv_mass_b = 1.0 / mass(J)
 
                 if( moved(I) .or. moved(J) ) then
 
@@ -1693,20 +1707,19 @@ module constraints
                     VIJ(3) = VZ(I) - VZ(J)
 
                     vdot = dot( RIJ, VIJ )
-                    L_ij = -vdot / ( 2.0 * len**2 )
+                    L_ij = -vdot / ( ( inv_mass_a + inv_mass_b ) * len**2 )
                     
                     if (abs(L_ij) > r_tol) then
 
-                        virial = virial + L_ij * len**2
-                        DV = L_ij * RIJ
+                        virial = virial + ( L_ij * len**2 ) / DT
 
-                        VX(I) = VX(I) + DV(1)
-                        VY(I) = VY(I) + DV(2)
-                        VZ(I) = VZ(I) + DV(3)
+                        VX(I) = VX(I) + ( L_ij * inv_mass_a ) * RIJ(1)
+                        VY(I) = VY(I) + ( L_ij * inv_mass_a ) * RIJ(2)
+                        VZ(I) = VZ(I) + ( L_ij * inv_mass_a ) * RIJ(3)
 
-                        VX(J) = VX(J) - DV(1)
-                        VY(J) = VY(J) - DV(2)
-                        VZ(J) = VZ(J) - DV(3)
+                        VX(J) = VX(J) - ( L_ij * inv_mass_b ) * RIJ(1)
+                        VY(J) = VY(J) - ( L_ij * inv_mass_b ) * RIJ(2)
+                        VZ(J) = VZ(J) - ( L_ij * inv_mass_b ) * RIJ(3)
 
                         moved(i) = .TRUE.
                         moved(j) = .TRUE.

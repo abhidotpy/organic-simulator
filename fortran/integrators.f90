@@ -771,7 +771,7 @@ module monte_carlo_barostat
     contains
     subroutine mc_barostat( compute_potential, accept, volume_change )
         implicit none
-        real(real64) :: V_old, V_new, scale
+        real(real64) :: V_old, V_new, volume, scale
         real(real64) :: U_old, U_new, dU
         real(real64) :: Lx_old, Ly_old, Lz_old
         real(real64) :: exponent, rand_u, beta

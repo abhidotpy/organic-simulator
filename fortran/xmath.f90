@@ -101,7 +101,6 @@ module xmath
     use iso_fortran_env, only: real64
     implicit none
     real, parameter :: pi = 3.1415926535897932384626433832795
-    real, parameter :: e = 2.7182818284590452353602874713527
 
     interface operator(.x.)
         module procedure vmdot
