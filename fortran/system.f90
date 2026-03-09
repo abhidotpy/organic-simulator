@@ -3,10 +3,10 @@ module atom
     implicit none
 
     real(real64), allocatable, dimension(:) :: mass, charge
-    real(real64), allocatable, dimension(:) :: shape_x, shape_y, shape_z, exc_rad
+    real(real64), allocatable, dimension(:) :: shape_x, shape_y, shape_z
     real(real64), allocatable, dimension(:) :: eshape_x, eshape_y, eshape_z
     real(real64), allocatable, dimension(:) :: Ixx, Iyy, Izz
-    integer, allocatable, dimension(:) :: rtype
+    integer, allocatable, dimension(:)      :: rtype
 
     real(real64), allocatable, dimension(:) :: RX, RY, RZ
     real(real64), allocatable, dimension(:) :: VX, VY, VZ
@@ -17,6 +17,7 @@ module atom
     real(real64), allocatable, dimension(:) :: TX, TY, TZ
 
     real(real64), allocatable, dimension(:) :: RX_old, RY_old, RZ_old
+    logical, allocatable, dimension(:)      :: mass_mask
 
 end module atom
 
@@ -24,8 +25,8 @@ module box
     use iso_fortran_env, only: real64
     implicit none
 
-    real(real64) :: box_length(3), volume
-    logical :: is_periodic
+    real(real64) :: box_length(3)
+    logical      :: is_periodic
 
 end module box
 
@@ -41,7 +42,7 @@ module system
     real(real64) :: temperature, pressure, density, virial
     real(real64) :: target_temp, target_pres
 
-    integer, dimension(:), allocatable :: BBI, BBJ
+    integer, dimension(:), allocatable      :: BBI, BBJ
     real(real64), dimension(:), allocatable :: BB_len
     
     logical :: default_mass_set     = .TRUE.
@@ -50,7 +51,6 @@ module system
     logical :: default_energy_set   = .TRUE.
     logical :: box_lengths_set      = .FALSE.
     logical :: num_atoms_set        = .FALSE.
-    logical :: density_set          = .FALSE.
     logical :: fcc_lattice_set      = .FALSE.
     logical :: constraints_set      = .FALSE.
     logical :: target_temp_set      = .FALSE.
@@ -67,9 +67,10 @@ module system
         num_atoms_set = .TRUE.
 
         allocate( mass(N), charge(N), rtype(N) )
-        allocate( shape_x(N), shape_y(N), shape_z(N), exc_rad(N) )
+        allocate( shape_x(N), shape_y(N), shape_z(N) )
         allocate( eshape_x(N), eshape_y(N), eshape_z(N) )
         allocate( Ixx(N), Iyy(N), Izz(N) )
+        allocate( mass_mask(N) )
 
         allocate( RX(N), RY(N), RZ(N) )
         allocate( VX(N), VY(N), VZ(N) )
@@ -79,9 +80,10 @@ module system
         allocate( QW(N), QX(N), QY(N), QZ(N) )
 
         mass = 1.0; charge = 0.0; rtype = 1;
-        shape_x = 1.0; shape_y = 1.0; shape_z = 1.0; exc_rad = 1.0
+        shape_x = 1.0; shape_y = 1.0; shape_z = 1.0;
         eshape_x = 1.0; eshape_y = 1.0; eshape_z = 1.0
         Ixx = 0.1; Iyy = 0.1; Izz = 0.1
+        mass_mask = .TRUE.
 
         RX = 0.0; RY = 0.0; RZ = 0.0
         VX = 0.0; VY = 0.0; VZ = 0.0
@@ -110,9 +112,13 @@ module system
     subroutine set_density( dens )
         implicit none
         real(real64), intent(in) :: dens
+        real(real64)             :: vol
 
-        density_set = .TRUE.
         density = dens
+        vol = sum( mass, mask=mass_mask ) / density
+
+        box_length = vol ** (1.0/3.0)
+
     end subroutine set_density
 
     subroutine set_atom_type( id, atom_type )
@@ -126,6 +132,7 @@ module system
         else if ( id < 1 .or. id > N ) then
             write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
             in system of ',I0,' atoms.')") id, N
+            stop
         else
             rtype(id) = atom_type
         endif
@@ -143,9 +150,14 @@ module system
         else if ( id < 1 .or. id > N ) then
             write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
             in system of ',I0,' atoms.')") id, N
+            stop
         else
             default_mass_set = .FALSE.
             mass(id) = atom_mass
+
+            if (atom_mass > 1E+6) then
+                mass_mask(id) = .FALSE.
+            endif
         endif
 
     end subroutine set_atom_mass
@@ -161,6 +173,7 @@ module system
         else if ( id < 1 .or. id > N ) then
             write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
             in system of ',I0,' atoms.')") id, N
+            stop
         else
             default_charge_set = .FALSE.
             charge(id) = atom_charge
@@ -184,8 +197,6 @@ module system
             box_length(2) = length
             box_length(3) = length
         endif
-
-        volume = box_length(1) * box_length(2) * box_length(3)
 
     end subroutine set_box
 
@@ -224,6 +235,7 @@ module system
         else if ( id < 1 .or. id > N ) then
             write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
             in system of ',I0,' atoms.')") id, N
+            stop
         else
             default_shape_set = .FALSE.
 
@@ -235,7 +247,6 @@ module system
             Iyy(id) = ( shape_x(id) ** 2.0 + shape_z(id) ** 2.0 ) / 20.0
             Izz(id) = ( shape_x(id) ** 2.0 + shape_y(id) ** 2.0 ) / 20.0
 
-            exc_rad(id) = max( length, width, height )
         endif
 
     
@@ -252,6 +263,7 @@ module system
         else if ( id < 1 .or. id > N ) then
             write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
             in system of ',I0,' atoms.')") id, N
+            stop
         else
             default_energy_set = .FALSE.
 
@@ -274,6 +286,7 @@ module system
         else if ( id < 1 .or. id > N ) then
             write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
             in system of ',I0,' atoms.')") id, N
+            stop
         else
             RX(id) = pos_x
             RY(id) = pos_y
@@ -294,6 +307,7 @@ module system
         else if ( id < 1 .or. id > N ) then
             write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
             in system of ',I0,' atoms.')") id, N
+            stop
         else
             VX(id) = vel_x
             VY(id) = vel_y
@@ -314,6 +328,7 @@ module system
         else if ( id < 1 .or. id > NC ) then
             write(*, "(1x, 'Error: Constraint index ', I0,' does not exist &
             in system of ',I0,' constraints.')") id, NC
+            stop
         else
             BBI(id) = I
             BBJ(id) = J
@@ -351,9 +366,9 @@ module system
             VZ(I) = sqrt( rtemp ) * vz_gen
         enddo
 
-        vx_com = sum(vx) / dble(N)
-        vy_com = sum(vy) / dble(N)
-        vz_com = sum(vz) / dble(N)
+        vx_com = sum(mass * vx) / sum(mass, mask=mass_mask)
+        vy_com = sum(mass * vy) / sum(mass, mask=mass_mask)
+        vz_com = sum(mass * vz) / sum(mass, mask=mass_mask)
 
         VX = VX - vx_com
         VY = VY - vy_com
@@ -378,31 +393,32 @@ module system
 
     subroutine generate_fcc_lattice( unit_cells, dens )
         implicit none
-        integer, intent(in) :: unit_cells
-        real(real64), intent(in) :: dens
-        integer             :: num_atoms, mtemp, I, J, K, IREF
-        real(real64)             :: cell, half_cell, rroot3
+        integer, intent(in)         :: unit_cells
+        real(real64), intent(in)    :: dens
+        integer                     :: num_atoms, mtemp, I, J, K, IREF
+        real(real64)                :: cell, half_cell, rroot3, vol, blen
 
         fcc_lattice_set = .TRUE.
         num_atoms = 4 * unit_cells ** 3
-        call set_num_atoms( num_atoms )
 
-        if ( box_lengths_set .eqv. .FALSE. ) then
-
-            box_lengths_set = .TRUE.
+        if ( num_atoms_set .eqv. .FALSE. ) then
+            call set_num_atoms( num_atoms )
+        else if ( N < num_atoms ) then
+            write(*, "(1x, 'Error: FCC lattice of ', I0,' atoms &
+            cannot be generated for system of ',I0,' atoms.')") num_atoms, N
+            stop
+        endif
             
-            if (dens == 0.0) then
-                write(*, "(1x, 'Error: Density cannot be zero.')")
-            else
-                density_set = .TRUE.
-                density = dens
-                volume = real(N) / density
-                box_length = volume ** (1.0/3.0)
-            endif
-
+        if (dens == 0.0) then
+            write(*, "(1x, 'Error: Density cannot be zero.')")
+            stop
+        else
+            density = dens
+            vol = sum( mass, mask=mass_mask ) / density
+            blen = vol ** (1.0/3.0)
         endif
 
-        cell = box_length(3) / real(unit_cells)
+        cell = blen / real(unit_cells)
         half_cell = cell / 2.0
         rroot3 = 1.0 / sqrt(3.0)
 
@@ -459,9 +475,14 @@ module system
             enddo
         enddo
 
-        RX = RX - box_length(1) / 2.0
-        RY = RY - box_length(2) / 2.0
-        RZ = RZ - box_length(3) / 2.0
+        RX(1:num_atoms) = RX(1:num_atoms) - box_length(1) / 2.0
+        RY(1:num_atoms) = RY(1:num_atoms) - box_length(2) / 2.0
+        RZ(1:num_atoms) = RZ(1:num_atoms) - box_length(3) / 2.0
+
+        if ( box_lengths_set .eqv. .FALSE. ) then
+            box_lengths_set = .TRUE.
+            box_length = blen
+        endif
 
     end subroutine generate_fcc_lattice
 
@@ -490,13 +511,7 @@ module system
         if (box_lengths_set) then
             if(message) write(*, "(1x, 'Box dimensions set to ', F0.2, 3X, F0.2, 3X, F0.2)") box_length
 
-            if (density_set) then
-                if(message) write(*, "(1x, 'Density of system set to ', F0.5)") density
-            else
-                density = dble(N) / volume
-                density_set = .TRUE.
-                if(message) write(*, "(1x, 'Density of system set to ', F0.5)") density
-            endif
+            if (message) write(*, "(1x, 'Density of system is ', F0.2)") density
 
         else
             if(message) write(*, "(1x, 'Error: Box dimensions not set. Set box dimensions &
@@ -505,9 +520,9 @@ module system
         endif
             
         if (is_periodic) then
-            if(message) write(*, "(1x, 'Periodic boundary conditions enabled for current system')")
+            if(message) write(*, "(1x, 'Periodic boundary conditions ENABLED')")
         else
-            if(message) write(*, "(1x, 'Periodic boundary conditions disabled for current system')")
+            if(message) write(*, "(1x, 'Periodic boundary conditions DISABLED')")
         endif
 
         if (default_mass_set) then
@@ -525,7 +540,6 @@ module system
             Iyy = ( shape_x(1) ** 2.0 + shape_z(1) ** 2.0 ) / 20.0
             Izz = ( shape_x(1) ** 2.0 + shape_y(1) ** 2.0 ) / 20.0
 
-            exc_rad = 1.0
             if(message) write(*, "(1x, 'Default shape for atoms set to ', G0.2)") shape_x(1)
         endif
         if (default_energy_set) then
@@ -551,6 +565,7 @@ module system
 
     subroutine calculate_state_variables()
         implicit none
+        real(real64) :: volume
 
         kinetic_energy = kinetic_energy + 0.5 * SUM( mass * ( VX ** 2 + VY ** 2 + VZ ** 2 ) )
         total_energy = potential_energy + kinetic_energy
@@ -559,11 +574,10 @@ module system
 
         virial = virial + SUM( RX * FX + RY * FY + RZ * FZ )
 
-        if (volume > 0.0) then
-            pressure = (density * temperature) + (virial / (3.0 * volume) )
-        endif
+        volume = product( box_length )
+        pressure = (density * temperature) + (virial / (3.0 * volume) )
 
-        density = dble(N) / volume
+        density = sum( mass, mask=mass_mask ) / volume
 
         potential_energy = potential_energy / dble(N)
         kinetic_energy = kinetic_energy / dble(N)
