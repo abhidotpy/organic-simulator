@@ -366,9 +366,9 @@ module system
             VZ(I) = sqrt( rtemp ) * vz_gen
         enddo
 
-        vx_com = sum(mass * vx) / sum(mass, mask=mass_mask)
-        vy_com = sum(mass * vy) / sum(mass, mask=mass_mask)
-        vz_com = sum(mass * vz) / sum(mass, mask=mass_mask)
+        vx_com = sum(mass * vx, mask=mass_mask) / sum(mass, mask=mass_mask)
+        vy_com = sum(mass * vy, mask=mass_mask) / sum(mass, mask=mass_mask)
+        vz_com = sum(mass * vz, mask=mass_mask) / sum(mass, mask=mass_mask)
 
         VX = VX - vx_com
         VY = VY - vy_com
@@ -475,14 +475,14 @@ module system
             enddo
         enddo
 
-        RX(1:num_atoms) = RX(1:num_atoms) - box_length(1) / 2.0
-        RY(1:num_atoms) = RY(1:num_atoms) - box_length(2) / 2.0
-        RZ(1:num_atoms) = RZ(1:num_atoms) - box_length(3) / 2.0
-
         if ( box_lengths_set .eqv. .FALSE. ) then
             box_lengths_set = .TRUE.
             box_length = blen
         endif
+
+        RX(1:num_atoms) = RX(1:num_atoms) - blen / 2.0
+        RY(1:num_atoms) = RY(1:num_atoms) - blen / 2.0
+        RZ(1:num_atoms) = RZ(1:num_atoms) - blen / 2.0
 
     end subroutine generate_fcc_lattice
 
@@ -507,24 +507,7 @@ module system
             particles before initializing system.')")
             stop
         endif
-
-        if (box_lengths_set) then
-            if(message) write(*, "(1x, 'Box dimensions set to ', F0.2, 3X, F0.2, 3X, F0.2)") box_length
-
-            if (message) write(*, "(1x, 'Density of system is ', F0.2)") density
-
-        else
-            if(message) write(*, "(1x, 'Error: Box dimensions not set. Set box dimensions &
-            before initializing system.')")
-            stop
-        endif
-            
-        if (is_periodic) then
-            if(message) write(*, "(1x, 'Periodic boundary conditions ENABLED')")
-        else
-            if(message) write(*, "(1x, 'Periodic boundary conditions DISABLED')")
-        endif
-
+        
         if (default_mass_set) then
             mass = 1.0
             if(message) write(*, "(1x, 'Default mass for atoms set to ', G0.2)") mass(1)
@@ -547,6 +530,23 @@ module system
             if(message) write(*, "(1x, 'Default energy for atoms set to ', G0.2)") eshape_x(1)
         endif
 
+        if (box_lengths_set) then
+            if(message) write(*, "(1x, 'Box dimensions set to ', F0.2, 3X, F0.2, 3X, F0.2)") box_length
+
+            if (message) write(*, "(1x, 'Density of system is ', F0.2)") sum( mass, mask=mass_mask ) / product( box_length )
+
+        else
+            if(message) write(*, "(1x, 'Error: Box dimensions not set. Set box dimensions &
+            before initializing system.')")
+            stop
+        endif
+            
+        if (is_periodic) then
+            if(message) write(*, "(1x, 'Periodic boundary conditions ENABLED')")
+        else
+            if(message) write(*, "(1x, 'Periodic boundary conditions DISABLED')")
+        endif
+
         if (fcc_lattice_set) then
             if(message) write(*, "(1x, 'FCC lattice generated with ', I0, ' particles')") N
         endif
@@ -567,7 +567,7 @@ module system
         implicit none
         real(real64) :: volume
 
-        kinetic_energy = kinetic_energy + 0.5 * SUM( mass * ( VX ** 2 + VY ** 2 + VZ ** 2 ) )
+        kinetic_energy = kinetic_energy + 0.5 * SUM( mass * ( VX ** 2 + VY ** 2 + VZ ** 2 ), mask=mass_mask )
         total_energy = potential_energy + kinetic_energy
 
         temperature = 2.0 * kinetic_energy / dble(dof)
@@ -575,9 +575,9 @@ module system
         virial = virial + SUM( RX * FX + RY * FY + RZ * FZ )
 
         volume = product( box_length )
-        pressure = (density * temperature) + (virial / (3.0 * volume) )
-
         density = sum( mass, mask=mass_mask ) / volume
+
+        pressure = (density * temperature) + (virial / (3.0 * volume) )
 
         potential_energy = potential_energy / dble(N)
         kinetic_energy = kinetic_energy / dble(N)

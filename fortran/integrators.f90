@@ -685,7 +685,7 @@ module nose_hoover_constraint_integrator
 
     end subroutine u4_propagator
 
-    subroutine nht_initial_step( DT, coupling )
+    subroutine nhtc_initial_step( DT, coupling )
         implicit none
         real(real64), intent(in) :: DT
         real(real64), optional, intent(in) :: coupling
@@ -731,9 +731,9 @@ module nose_hoover_constraint_integrator
 
         call apply_constraints_a( DT )
 
-    end subroutine nht_initial_step
+    end subroutine nhtc_initial_step
 
-    subroutine nht_final_step( DT, coupling )
+    subroutine nhtc_final_step( DT, coupling )
         implicit none
         real(real64), intent(in) :: DT
         real(real64), optional, intent(in) :: coupling
@@ -760,7 +760,7 @@ module nose_hoover_constraint_integrator
 
         call apply_constraints_b( DT )
 
-    end subroutine nht_final_step
+    end subroutine nhtc_final_step
 
 end module nose_hoover_constraint_integrator
 
