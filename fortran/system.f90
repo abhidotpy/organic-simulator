@@ -2,11 +2,12 @@ module atom
     use iso_fortran_env, only: real64
     implicit none
 
-    real(real64), allocatable, dimension(:) :: mass, charge
+    real(real64), allocatable, dimension(:) :: mass, charge, inv_mass
     real(real64), allocatable, dimension(:) :: shape_x, shape_y, shape_z
     real(real64), allocatable, dimension(:) :: eshape_x, eshape_y, eshape_z
     real(real64), allocatable, dimension(:) :: Ixx, Iyy, Izz
-    integer, allocatable, dimension(:)      :: rtype
+    real(real64), allocatable, dimension(:) :: Ixx_inv, Iyy_inv, Izz_inv
+    integer,      allocatable, dimension(:) :: rtype
 
     real(real64), allocatable, dimension(:) :: RX, RY, RZ
     real(real64), allocatable, dimension(:) :: VX, VY, VZ
@@ -17,7 +18,6 @@ module atom
     real(real64), allocatable, dimension(:) :: TX, TY, TZ
 
     real(real64), allocatable, dimension(:) :: RX_old, RY_old, RZ_old
-    logical, allocatable, dimension(:)      :: mass_mask
 
 end module atom
 
@@ -49,6 +49,7 @@ module system
     logical :: default_charge_set   = .TRUE.
     logical :: default_shape_set    = .TRUE.
     logical :: default_energy_set   = .TRUE.
+    logical :: default_inertia_set  = .TRUE.
     logical :: box_lengths_set      = .FALSE.
     logical :: num_atoms_set        = .FALSE.
     logical :: fcc_lattice_set      = .FALSE.
@@ -66,11 +67,11 @@ module system
         dof = 6 * N
         num_atoms_set = .TRUE.
 
-        allocate( mass(N), charge(N), rtype(N) )
+        allocate( mass(N), inv_mass(N), charge(N), rtype(N) )
         allocate( shape_x(N), shape_y(N), shape_z(N) )
         allocate( eshape_x(N), eshape_y(N), eshape_z(N) )
         allocate( Ixx(N), Iyy(N), Izz(N) )
-        allocate( mass_mask(N) )
+        allocate( Ixx_inv(N), Iyy_inv(N), Izz_inv(N) )
 
         allocate( RX(N), RY(N), RZ(N) )
         allocate( VX(N), VY(N), VZ(N) )
@@ -79,11 +80,11 @@ module system
         allocate( TX(N), TY(N), TZ(N) )
         allocate( QW(N), QX(N), QY(N), QZ(N) )
 
-        mass = 1.0; charge = 0.0; rtype = 1;
+        mass = 1.0; inv_mass = 1.0; charge = 0.0; rtype = 1;
         shape_x = 1.0; shape_y = 1.0; shape_z = 1.0;
         eshape_x = 1.0; eshape_y = 1.0; eshape_z = 1.0
-        Ixx = 0.1; Iyy = 0.1; Izz = 0.1
-        mass_mask = .TRUE.
+        Ixx = 0.0; Iyy = 0.0; Izz = 0.0;
+        Ixx_inv = 0.0; Iyy_inv = 0.0; Izz_inv = 0.0
 
         RX = 0.0; RY = 0.0; RZ = 0.0
         VX = 0.0; VY = 0.0; VZ = 0.0
@@ -115,9 +116,6 @@ module system
         real(real64)             :: vol
 
         density = dens
-        vol = sum( mass, mask=mass_mask ) / density
-
-        box_length = vol ** (1.0/3.0)
 
     end subroutine set_density
 
@@ -155,8 +153,10 @@ module system
             default_mass_set = .FALSE.
             mass(id) = atom_mass
 
-            if (atom_mass > 1E+6) then
-                mass_mask(id) = .FALSE.
+            if (atom_mass == 0.0 ) then
+                inv_mass(id) = 0.0
+            else
+                inv_mass(id) = 1.0d0 / atom_mass
             endif
         endif
 
@@ -247,9 +247,12 @@ module system
             Iyy(id) = ( shape_x(id) ** 2.0 + shape_z(id) ** 2.0 ) / 20.0
             Izz(id) = ( shape_x(id) ** 2.0 + shape_y(id) ** 2.0 ) / 20.0
 
+            Ixx_inv(id) = 1.0d0 / Ixx(id)
+            Iyy_inv(id) = 1.0d0 / Iyy(id)
+            Izz_inv(id) = 1.0d0 / Izz(id)
+
         endif
 
-    
     end subroutine set_atom_shape
 
     subroutine set_atom_energy( id, eng_x, eng_y, eng_z )
@@ -316,6 +319,37 @@ module system
 
     end subroutine set_atom_velocity
 
+    subroutine set_atom_inertia( id, inx, iny, inz )
+        implicit none
+        integer, intent(in)      :: id
+        real(real64), intent(in) :: inx, iny, inz
+
+        if (num_atoms_set .eqv. .FALSE.) then
+            write(*, "(1x, 'Error: System has no atoms. Set number of atoms first.')")
+            stop
+        else if ( id < 1 .or. id > N ) then
+            write(*, "(1x, 'Error: Atom index ', I0,' does not exist &
+            in system of ',I0,' atoms.')") id, N
+            stop
+        else
+            default_inertia_set = .FALSE.
+            IXX(id) = inx
+            IYY(id) = iny
+            IZZ(id) = inz
+
+            if (mass(id) > 0.0 ) then
+                IXX_inv(id) = 1.0d0 / IXX(id)
+                IYY_inv(id) = 1.0d0 / IYY(id)
+                IZZ_inv(id) = 1.0d0 / IZZ(id)
+            else
+                IXX_inv(id) = 0.0d0
+                IYY_inv(id) = 0.0d0
+                IZZ_inv(id) = 0.0d0
+            endif
+        endif
+
+    end subroutine set_atom_inertia
+
     subroutine add_constraint(id, I, J, length)
         implicit none
         integer, intent(in) :: id
@@ -366,9 +400,9 @@ module system
             VZ(I) = sqrt( rtemp ) * vz_gen
         enddo
 
-        vx_com = sum(mass * vx, mask=mass_mask) / sum(mass, mask=mass_mask)
-        vy_com = sum(mass * vy, mask=mass_mask) / sum(mass, mask=mass_mask)
-        vz_com = sum(mass * vz, mask=mass_mask) / sum(mass, mask=mass_mask)
+        vx_com = sum( mass * vx ) / sum( mass )
+        vy_com = sum( mass * vy ) / sum( mass )
+        vz_com = sum( mass * vz ) / sum( mass )
 
         VX = VX - vx_com
         VY = VY - vy_com
@@ -414,7 +448,7 @@ module system
             stop
         else
             density = dens
-            vol = sum( mass, mask=mass_mask ) / density
+            vol = sum( mass ) / density
             blen = vol ** (1.0/3.0)
         endif
 
@@ -489,7 +523,8 @@ module system
     subroutine initialize_system( m )
         implicit none
         logical, optional :: m
-        logical :: message
+        logical           :: message
+        integer           :: IC
 
         if (not(present(m))) then
             message = .TRUE.
@@ -519,10 +554,6 @@ module system
         if (default_shape_set) then
             shape_x = 1.0; shape_y = 1.0; shape_z = 1.0
 
-            Ixx = ( shape_y(1) ** 2.0 + shape_z(1) ** 2.0 ) / 20.0
-            Iyy = ( shape_x(1) ** 2.0 + shape_z(1) ** 2.0 ) / 20.0
-            Izz = ( shape_x(1) ** 2.0 + shape_y(1) ** 2.0 ) / 20.0
-
             if(message) write(*, "(1x, 'Default shape for atoms set to ', G0.2)") shape_x(1)
         endif
         if (default_energy_set) then
@@ -533,7 +564,7 @@ module system
         if (box_lengths_set) then
             if(message) write(*, "(1x, 'Box dimensions set to ', F0.2, 3X, F0.2, 3X, F0.2)") box_length
 
-            if (message) write(*, "(1x, 'Density of system is ', F0.2)") sum( mass, mask=mass_mask ) / product( box_length )
+            if (message) write(*, "(1x, 'Density of system is ', F0.2)") sum( mass ) / product( box_length )
 
         else
             if(message) write(*, "(1x, 'Error: Box dimensions not set. Set box dimensions &
@@ -551,9 +582,35 @@ module system
             if(message) write(*, "(1x, 'FCC lattice generated with ', I0, ' particles')") N
         endif
 
-        Ixx = Ixx * mass
-        Iyy = Iyy * mass
-        Izz = Izz * mass
+        if (default_inertia_set) then
+
+            Ixx = ( shape_y(1) ** 2.0 + shape_z(1) ** 2.0 ) / 20.0
+            Iyy = ( shape_x(1) ** 2.0 + shape_z(1) ** 2.0 ) / 20.0
+            Izz = ( shape_x(1) ** 2.0 + shape_y(1) ** 2.0 ) / 20.0
+
+            do IC = 1, N
+
+                if (mass(IC) > 0.0) then
+                    Ixx(IC) = Ixx(IC) * mass(IC)
+                    Iyy(IC) = Iyy(IC) * mass(IC)
+                    Izz(IC) = Izz(IC) * mass(IC)
+
+                    Ixx_inv(IC) = 1.0d0 / Ixx(IC)
+                    Iyy_inv(IC) = 1.0d0 / Iyy(IC)
+                    Izz_inv(IC) = 1.0d0 / Izz(IC)
+                
+                else
+                    Ixx(IC) = 0.0
+                    Iyy(IC) = 0.0
+                    Izz(IC) = 0.0
+
+                    Ixx_inv(IC) = 0.0
+                    Iyy_inv(IC) = 0.0
+                    Izz_inv(IC) = 0.0
+                endif
+
+            enddo
+        endif
         
         if(message) write(*, "(1x, 'System initialization complete.')")
 
@@ -567,7 +624,7 @@ module system
         implicit none
         real(real64) :: volume
 
-        kinetic_energy = kinetic_energy + 0.5 * SUM( mass * ( VX ** 2 + VY ** 2 + VZ ** 2 ), mask=mass_mask )
+        kinetic_energy = kinetic_energy + 0.5 * SUM( mass * ( VX ** 2 + VY ** 2 + VZ ** 2 ) )
         total_energy = potential_energy + kinetic_energy
 
         temperature = 2.0 * kinetic_energy / dble(dof)
@@ -575,7 +632,7 @@ module system
         virial = virial + SUM( RX * FX + RY * FY + RZ * FZ )
 
         volume = product( box_length )
-        density = sum( mass, mask=mass_mask ) / volume
+        density = sum( mass ) / volume
 
         pressure = (density * temperature) + (virial / (3.0 * volume) )
 
@@ -594,13 +651,13 @@ module system
         offset = (/ xoffset, yoffset, zoffset /)
 
         rot(1, 1) = QW(from)**2 + QX(from)**2 - QY(from)**2 - QZ(from)**2
-        rot(1, 2) = 2.0 * ( QX(from) * QY(from) + QW(from) * QZ(from) )
-        rot(1, 3) = 2.0 * ( QX(from) * QZ(from) - QW(from) * QY(from) )
-        rot(2, 1) = 2.0 * ( QX(from) * QY(from) - QW(from) * QZ(from) )
+        rot(1, 2) = 2.0 * ( QX(from) * QY(from) - QW(from) * QZ(from) )
+        rot(1, 3) = 2.0 * ( QX(from) * QZ(from) + QW(from) * QY(from) )
+        rot(2, 1) = 2.0 * ( QX(from) * QY(from) + QW(from) * QZ(from) )
         rot(2, 2) = QW(from)**2 - QX(from)**2 + QY(from)**2 - QZ(from)**2
-        rot(2, 3) = 2.0 * ( QY(from) * QZ(from) + QW(from) * QX(from) )
-        rot(3, 1) = 2.0 * ( QX(from) * QZ(from) + QW(from) * QY(from) )
-        rot(3, 2) = 2.0 * ( QY(from) * QZ(from) - QW(from) * QX(from) )
+        rot(2, 3) = 2.0 * ( QY(from) * QZ(from) - QW(from) * QX(from) )
+        rot(3, 1) = 2.0 * ( QX(from) * QZ(from) - QW(from) * QY(from) )
+        rot(3, 2) = 2.0 * ( QY(from) * QZ(from) + QW(from) * QX(from) )
         rot(3, 3) = QW(from)**2 - QX(from)**2 - QY(from)**2 + QZ(from)**2
 
         rot_offset(1) = rot(1, 1) * offset(1) + rot(1, 2) * offset(2) + rot(1, 3) * offset(3)
@@ -612,5 +669,41 @@ module system
         RZ(to) = RZ(from) + rot_offset(3)
 
     end subroutine copy_transform
+
+    subroutine transfer_forces( from, to )
+        implicit none
+        integer, intent(in) :: from, to
+        real(real64)        :: rij(3), fij_from(3), tij_to(3)
+
+        rij(1) = RX(from) - RX(to)
+        rij(2) = RY(from) - RY(to)
+        rij(3) = RZ(from) - RZ(to)
+
+        if (is_periodic) then
+            rij = rij - ANINT( rij / box_length ) * box_length
+        endif
+        
+        fij_from(1) = FX(from)
+        fij_from(2) = FY(from)
+        fij_from(3) = FZ(from)
+        tij_to = cross( rij, fij_from )
+
+        FX(to) = FX(to) + FX(from)
+        FY(to) = FY(to) + FY(from)
+        FZ(to) = FZ(to) + FZ(from)
+
+        TX(to) = TX(to) + tij_to(1)
+        TY(to) = TY(to) + tij_to(2)
+        TZ(to) = TZ(to) + tij_to(3)
+
+        FX(from) = 0.0
+        FY(from) = 0.0
+        FZ(from) = 0.0
+
+        TX(from) = 0.0
+        TY(from) = 0.0
+        TZ(from) = 0.0
+
+    end subroutine transfer_forces
 
 end module system

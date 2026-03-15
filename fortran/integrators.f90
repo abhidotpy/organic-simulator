@@ -7,9 +7,9 @@ module verlet_integrator
         implicit none
         real(real64), intent(in) :: DT
 
-        VX = VX + 0.5 * DT * ( FX / mass )
-        VY = VY + 0.5 * DT * ( FY / mass )
-        VZ = VZ + 0.5 * DT * ( FZ / mass )
+        VX = VX + 0.5 * DT * ( FX * inv_mass )
+        VY = VY + 0.5 * DT * ( FY * inv_mass )
+        VZ = VZ + 0.5 * DT * ( FZ * inv_mass )
 
         RX = RX + DT * VX
         RY = RY + DT * VY
@@ -27,9 +27,9 @@ module verlet_integrator
         implicit none
         real(real64), intent(in) :: DT
 
-        VX = VX + 0.5 * DT * ( FX / mass )
-        VY = VY + 0.5 * DT * ( FY / mass )
-        VZ = VZ + 0.5 * DT * ( FZ / mass )
+        VX = VX + 0.5 * DT * ( FX * inv_mass )
+        VY = VY + 0.5 * DT * ( FY * inv_mass )
+        VZ = VZ + 0.5 * DT * ( FZ * inv_mass )
 
     end subroutine vv_final_step
 
@@ -76,9 +76,9 @@ module quaternion_integrator
                 RM(3, 2) = 2.0 * ( QY_old * QZ_old - QW_old * QX_old )
                 RM(3, 3) = QW_old**2 - QX_old**2 - QY_old**2 + QZ_old**2
 
-                WX_body = ( RM(1,1) * LX(I) + RM(1,2) * LY(I) + RM(1,3) * LZ(I) ) / Ixx(I)
-                WY_body = ( RM(2,1) * LX(I) + RM(2,2) * LY(I) + RM(2,3) * LZ(I) ) / Iyy(I)
-                WZ_body = ( RM(3,1) * LX(I) + RM(3,2) * LY(I) + RM(3,3) * LZ(I) ) / Izz(I)
+                WX_body = ( RM(1,1) * LX(I) + RM(1,2) * LY(I) + RM(1,3) * LZ(I) ) * Ixx_inv(I)
+                WY_body = ( RM(2,1) * LX(I) + RM(2,2) * LY(I) + RM(2,3) * LZ(I) ) * Iyy_inv(I)
+                WZ_body = ( RM(3,1) * LX(I) + RM(3,2) * LY(I) + RM(3,3) * LZ(I) ) * Izz_inv(I)
 
                 QDW = 0.5 * ( - QX_Old * WX_body - QY_Old * WY_body - QZ_Old * WZ_body )
                 QDX = 0.5 * (   QW_Old * WX_body + QY_Old * WZ_body - QZ_Old * WY_body )
@@ -132,9 +132,9 @@ module quaternion_integrator
             LY_body = ( RM(2,1) * LX(I) + RM(2,2) * LY(I) + RM(2,3) * LZ(I) )
             LZ_body = ( RM(3,1) * LX(I) + RM(3,2) * LY(I) + RM(3,3) * LZ(I) )
 
-            kinetic_energy = kinetic_energy + 0.5 * ( ( LX_body ** 2.0) / Ixx(I) + &
-                                                      ( LY_body ** 2.0) / Iyy(I) + &
-                                                      ( LZ_body ** 2.0) / Izz(I) )
+            kinetic_energy = kinetic_energy + 0.5 * ( ( LX_body ** 2.0) * Ixx_inv(I) + &
+                                                      ( LY_body ** 2.0) * Iyy_inv(I) + &
+                                                      ( LZ_body ** 2.0) * Izz_inv(I) )
 
         enddo
 
@@ -206,9 +206,9 @@ module nose_hoover
 
         CALL u4_propagator( DT / 4.0, 1, N_th, 1)
 
-        VX = VX + 0.5 * DT * ( FX / mass )
-        VY = VY + 0.5 * DT * ( FY / mass )
-        VZ = VZ + 0.5 * DT * ( FZ / mass )
+        VX = VX + 0.5 * DT * ( FX * inv_mass )
+        VY = VY + 0.5 * DT * ( FY * inv_mass )
+        VZ = VZ + 0.5 * DT * ( FZ * inv_mass )
 
         RX = RX + DT * VX
         RY = RY + DT * VY
@@ -233,9 +233,9 @@ module nose_hoover
             HB = 1.0
         endif
 
-        VX = VX + 0.5 * DT * ( FX / mass )
-        VY = VY + 0.5 * DT * ( FY / mass )
-        VZ = VZ + 0.5 * DT * ( FZ / mass )
+        VX = VX + 0.5 * DT * ( FX * inv_mass )
+        VY = VY + 0.5 * DT * ( FY * inv_mass )
+        VZ = VZ + 0.5 * DT * ( FZ * inv_mass )
 
         call u4_propagator( DT / 4.0, N_th, 1, -1)
 
@@ -287,9 +287,9 @@ module langevin_integrator
 
         do I = 1, N
 
-            VX(I) = VX(I) + 0.5 * DT * ( FX(I) / mass(I) )
-            VY(I) = VY(I) + 0.5 * DT * ( FY(I) / mass(I) )
-            VZ(I) = VZ(I) + 0.5 * DT * ( FZ(I) / mass(I) )
+            VX(I) = VX(I) + 0.5 * DT * ( FX(I) * inv_mass(I) )
+            VY(I) = VY(I) + 0.5 * DT * ( FY(I) * inv_mass(I) )
+            VZ(I) = VZ(I) + 0.5 * DT * ( FZ(I) * inv_mass(I) )
 
             RX(I) = RX(I) + 0.5 * DT * VX(I)
             RY(I) = RY(I) + 0.5 * DT * VY(I)
@@ -336,9 +336,9 @@ module langevin_integrator
                 LY_body = ( RM(2,1) * LX(I) + RM(2,2) * LY(I) + RM(2,3) * LZ(I) )
                 LZ_body = ( RM(3,1) * LX(I) + RM(3,2) * LY(I) + RM(3,3) * LZ(I) )
 
-                WX_body = LX_body / Ixx(I)
-                WY_body = LY_body / Iyy(I)
-                WZ_body = LZ_body / Izz(I)
+                WX_body = LX_body * Ixx_inv(I)
+                WY_body = LY_body * Iyy_inv(I)
+                WZ_body = LZ_body * Izz_inv(I)
 
                 QDW = 0.5 * ( - QX_Old * WX_body - QY_Old * WY_body - QZ_Old * WZ_body )
                 QDX = 0.5 * (   QW_Old * WX_body + QY_Old * WZ_body - QZ_Old * WY_body )
@@ -389,9 +389,9 @@ module langevin_integrator
 
         do I = 1, N
 
-            VX(I) = VX(I) + 0.5 * DT * ( FX(I) / mass(I) )
-            VY(I) = VY(I) + 0.5 * DT * ( FY(I) / mass(I) )
-            VZ(I) = VZ(I) + 0.5 * DT * ( FZ(I) / mass(I) )
+            VX(I) = VX(I) + 0.5 * DT * ( FX(I) * inv_mass(I) )
+            VY(I) = VY(I) + 0.5 * DT * ( FY(I) * inv_mass(I) )
+            VZ(I) = VZ(I) + 0.5 * DT * ( FZ(I) * inv_mass(I) )
 
             LX(I) = LX(I) + 0.5 * DT * TX(I)
             LY(I) = LY(I) + 0.5 * DT * TY(I)
@@ -411,9 +411,9 @@ module langevin_integrator
             LY_body = ( RM(2,1) * LX(I) + RM(2,2) * LY(I) + RM(2,3) * LZ(I) )
             LZ_body = ( RM(3,1) * LX(I) + RM(3,2) * LY(I) + RM(3,3) * LZ(I) )
 
-            kinetic_energy = kinetic_energy + 0.5 * ( ( LX_body ** 2.0) / Ixx(I) + &
-                                                      ( LY_body ** 2.0) / Iyy(I) + &
-                                                      ( LZ_body ** 2.0) / Izz(I) )
+            kinetic_energy = kinetic_energy + 0.5 * ( ( LX_body ** 2.0) * Ixx_inv(I) + &
+                                                      ( LY_body ** 2.0) * Iyy_inv(I) + &
+                                                      ( LZ_body ** 2.0) * Izz_inv(I) )
 
         enddo
 
@@ -431,9 +431,9 @@ module verlet_constraint_integrator
         implicit none
         real(real64), intent(in) :: DT
 
-        VX = VX + 0.5 * DT * ( FX / mass )
-        VY = VY + 0.5 * DT * ( FY / mass )
-        VZ = VZ + 0.5 * DT * ( FZ / mass )
+        VX = VX + 0.5 * DT * ( FX * inv_mass )
+        VY = VY + 0.5 * DT * ( FY * inv_mass )
+        VZ = VZ + 0.5 * DT * ( FZ * inv_mass )
 
         RX_old = RX
         RY_old = RY
@@ -457,9 +457,9 @@ module verlet_constraint_integrator
         implicit none
         real(real64), intent(in) :: DT
 
-        VX = VX + 0.5 * DT * ( FX / mass )
-        VY = VY + 0.5 * DT * ( FY / mass )
-        VZ = VZ + 0.5 * DT * ( FZ / mass )
+        VX = VX + 0.5 * DT * ( FX * inv_mass )
+        VY = VY + 0.5 * DT * ( FY * inv_mass )
+        VZ = VZ + 0.5 * DT * ( FZ * inv_mass )
 
         call apply_constraints_b( DT )
 
@@ -504,9 +504,9 @@ module langevin_constraint_integrator
 
         do I = 1, N
 
-            VX(I) = VX(I) + 0.5 * DT * ( FX(I) / mass(I) )
-            VY(I) = VY(I) + 0.5 * DT * ( FY(I) / mass(I) )
-            VZ(I) = VZ(I) + 0.5 * DT * ( FZ(I) / mass(I) )
+            VX(I) = VX(I) + 0.5 * DT * ( FX(I) * inv_mass(I) )
+            VY(I) = VY(I) + 0.5 * DT * ( FY(I) * inv_mass(I) )
+            VZ(I) = VZ(I) + 0.5 * DT * ( FZ(I) * inv_mass(I) )
 
             RX_old(I) = RX(I)
             RY_old(I) = RY(I)
@@ -557,9 +557,9 @@ module langevin_constraint_integrator
                 LY_body = ( RM(2,1) * LX(I) + RM(2,2) * LY(I) + RM(2,3) * LZ(I) )
                 LZ_body = ( RM(3,1) * LX(I) + RM(3,2) * LY(I) + RM(3,3) * LZ(I) )
 
-                WX_body = LX_body / Ixx(I)
-                WY_body = LY_body / Iyy(I)
-                WZ_body = LZ_body / Izz(I)
+                WX_body = LX_body * Ixx_inv(I)
+                WY_body = LY_body * Iyy_inv(I)
+                WZ_body = LZ_body * Izz_inv(I)
 
                 QDW = 0.5 * ( - QX_Old * WX_body - QY_Old * WY_body - QZ_Old * WZ_body )
                 QDX = 0.5 * (   QW_Old * WX_body + QY_Old * WZ_body - QZ_Old * WY_body )
@@ -612,9 +612,9 @@ module langevin_constraint_integrator
 
         do I = 1, N
 
-            VX(I) = VX(I) + 0.5 * DT * ( FX(I) / mass(I) )
-            VY(I) = VY(I) + 0.5 * DT * ( FY(I) / mass(I) )
-            VZ(I) = VZ(I) + 0.5 * DT * ( FZ(I) / mass(I) )
+            VX(I) = VX(I) + 0.5 * DT * ( FX(I) * inv_mass(I) )
+            VY(I) = VY(I) + 0.5 * DT * ( FY(I) * inv_mass(I) )
+            VZ(I) = VZ(I) + 0.5 * DT * ( FZ(I) * inv_mass(I) )
 
             LX(I) = LX(I) + 0.5 * DT * TX(I)
             LY(I) = LY(I) + 0.5 * DT * TY(I)
@@ -634,9 +634,9 @@ module langevin_constraint_integrator
             LY_body = ( RM(2,1) * LX(I) + RM(2,2) * LY(I) + RM(2,3) * LZ(I) )
             LZ_body = ( RM(3,1) * LX(I) + RM(3,2) * LY(I) + RM(3,3) * LZ(I) )
 
-            kinetic_energy = kinetic_energy + 0.5 * ( ( LX_body ** 2.0) / Ixx(I) + &
-                                                      ( LY_body ** 2.0) / Iyy(I) + &
-                                                      ( LZ_body ** 2.0) / Izz(I) )
+            kinetic_energy = kinetic_energy + 0.5 * ( ( LX_body ** 2.0) * Ixx_inv(I) + &
+                                                      ( LY_body ** 2.0) * Iyy_inv(I) + &
+                                                      ( LZ_body ** 2.0) * Izz_inv(I) )
 
         enddo
 
@@ -711,9 +711,9 @@ module nose_hoover_constraint_integrator
 
         CALL u4_propagator( DT / 4.0, 1, N_th, 1)
 
-        VX = VX + 0.5 * DT * ( FX / mass )
-        VY = VY + 0.5 * DT * ( FY / mass )
-        VZ = VZ + 0.5 * DT * ( FZ / mass )
+        VX = VX + 0.5 * DT * ( FX * inv_mass )
+        VY = VY + 0.5 * DT * ( FY * inv_mass )
+        VZ = VZ + 0.5 * DT * ( FZ * inv_mass )
 
         RX_old = RX
         RY_old = RY
@@ -744,9 +744,9 @@ module nose_hoover_constraint_integrator
             HB = 1.0
         endif
 
-        VX = VX + 0.5 * DT * ( FX / mass )
-        VY = VY + 0.5 * DT * ( FY / mass )
-        VZ = VZ + 0.5 * DT * ( FZ / mass )
+        VX = VX + 0.5 * DT * ( FX * inv_mass )
+        VY = VY + 0.5 * DT * ( FY * inv_mass )
+        VZ = VZ + 0.5 * DT * ( FZ * inv_mass )
 
         call u4_propagator( DT / 4.0, N_th, 1, -1)
 
