@@ -120,6 +120,7 @@ module wca
 
         rij_sq = SUM( RIJ ** 2.0 )
         rcut_sq = cutoff ** 2.0
+        PE = 0.0; FXIJ = 0.0
 
         if (rij_sq < rcut_sq) then
             sigma_sq = ( (shape_z(I) + shape_z(J)) / 2.0 ) ** 2.0
@@ -129,9 +130,6 @@ module wca
                 PE = sigma_sq * (( sr2_lj**6.0 - 2.0*sr2_lj**3.0 ) + 1.0)
                 coeff = 12.0 * sigma_sq * (sr2_lj**6 - sr2_lj**3)
                 FXIJ = coeff * RIJ / rij_sq
-            else
-                PE = 0.0
-                FXIJ = 0.0
             endif
         endif
 
@@ -252,27 +250,28 @@ module gay_berne
         
     end function dG_du2
 
-    pure subroutine gb_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width )
+    pure subroutine gb_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, repulsive )
         implicit none
-        integer, intent(in)             :: I, J
+        integer, intent(in)                  :: I, J
         real(real64), intent(in)             :: cutoff
         real(real64), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
         real(real64), optional, intent(in)   :: width
-        
-        type(gb_parameters) :: param
-        type(gb_pair)       :: pair
+        logical, optional, intent(in)        :: repulsive
         
         real(real64), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2
         real(real64), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
         real(real64), dimension(3)           :: FIJ, TI, TJ, TORQ1, TORQ2
-
+        
         real(real64)                         :: meu, neu
         real(real64)                         :: eps1, eps2, sr, sr_cut, sigma, sigma_0
         real(real64)                         :: pot, wf, srx_fac, srd_fac
         real(real64)                         :: switch, xx, sx, sdx, factor
-        logical                         :: imp_wat
+        logical                              :: imp_wat
+        type(gb_parameters)                  :: param
+        type(gb_pair)                        :: pair
 
         meu = 1.0; neu = 2.0; sigma_0 = 1.0; imp_wat = .FALSE.
+        pot = 0.0; FIJ = 0.0; TORQ1 = 0.0; TORQ2 = 0.0
 
         if (present(width)) then
             wf = width
@@ -321,20 +320,37 @@ module gay_berne
 
         if ( pair % RIJ_MAG < ( sigma + cutoff + wf ) ) then
 
-            if (imp_wat) then
+            if( present(repulsive) .and. repulsive ) then
+
                 if ( pair % RIJ_MAG < sigma ) then
                     sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
-                else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
-                    sr = sigma_0 / ( sigma - sigma + sigma_0 )
-                else
-                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
-                endif
-            else
-                sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
-            endif
 
-            srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
-            srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
+                    srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0) + 1.0
+                    srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
+                else
+                    sr = 0.0
+                    srx_fac = 0.0
+                    srd_fac = 0.0
+                endif
+
+            else
+
+                if (imp_wat) then
+                    if ( pair % RIJ_MAG < sigma ) then
+                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+                    else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
+                        sr = sigma_0 / ( sigma - sigma + sigma_0 )
+                    else
+                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
+                    endif
+                else
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+                endif
+
+                srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
+                srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
+            
+            endif
 
             dR_dr   = (1.0 / sigma_0) * (( pair % RIJ / pair % RIJ_MAG ) + 0.5 * shape_x(I) * dG_dr( param % chi, param, pair ) * g_func( param % chi, param, pair ) ** (-3.0 / 2.0))
             de2_dr  = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_dr( param % xhi, param, pair )
@@ -361,11 +377,6 @@ module gay_berne
                 TORQ2 = sx * TORQ2 - sdx * pot * factor
             endif
 
-        else
-            pot = 0.0
-            FIJ = 0.0
-            TORQ1 = 0.0
-            TORQ2 = 0.0
         endif
 
         PE = pot
@@ -544,34 +555,36 @@ module ecp
         
     end function optim_dist
 
-    pure subroutine ecp_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width )
+    pure subroutine ecp_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, repulsive )
         implicit none
-        integer, intent(in)             :: I, J
+        integer, intent(in)                  :: I, J
         real(real64), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
         real(real64), intent(in)             :: cutoff
         real(real64), optional, intent(in)   :: width
-
-        type(ecp_pair) :: pair
-
-        real(real64), dimension(3, 3) :: U1, U2, S1, S2, E1, E2, EM
-        real(real64), dimension(3, 3) :: GE, GR, MM1, MM2
-        real(real64), dimension(3)    :: KE, KR
-        real(real64)                  :: lambda_E, lambda_R
-        real(real64)                  :: meu, neu
-
-        real(real64), dimension(3)    :: dR_dr, de2_dr
-        real(real64), dimension(3)    :: de1_du1x, de1_du1y, de1_du1z, de1_du1, de2_du1, dR_du1
-        real(real64), dimension(3)    :: de1_du2x, de1_du2y, de1_du2z, de1_du2, de2_du2, dR_du2
-        real(real64), dimension(3)    :: FIJ, TORQ1, TORQ2
-
-        real(real64)                  :: eps1, eps2, sr, phi, sigma, sigma_0
-        real(real64)                  :: e10, e20, sigma_t1, sigma_t2, sigma_t
-        real(real64)                  :: pot, wf, efac, rfac, srx_fac, srd_fac
-        real(real64)                  :: switch, xx, sx, sdx, factor
-        logical                  :: imp_wat, ierr_e, ierr_r
+        logical, optional, intent(in)        :: repulsive
+        
+        real(real64), dimension(3, 3)        :: U1, U2, S1, S2, E1, E2, EM
+        real(real64), dimension(3, 3)        :: GE, GR, MM1, MM2
+        real(real64), dimension(3)           :: KE, KR
+        real(real64)                         :: lambda_E, lambda_R
+        real(real64)                         :: meu, neu
+        
+        real(real64), dimension(3)           :: dR_dr, de2_dr
+        real(real64), dimension(3)           :: de1_du1x, de1_du1y, de1_du1z, de1_du1, de2_du1, dR_du1
+        real(real64), dimension(3)           :: de1_du2x, de1_du2y, de1_du2z, de1_du2, de2_du2, dR_du2
+        real(real64), dimension(3)           :: FIJ, TORQ1, TORQ2
+        
+        real(real64)                         :: eps1, eps2, sr, phi, sigma, sigma_0
+        real(real64)                         :: e10, e20, sigma_t1, sigma_t2, sigma_t
+        real(real64)                         :: pot, wf, efac, rfac, srx_fac, srd_fac
+        real(real64)                         :: switch, xx, sx, sdx, factor
+        logical                              :: imp_wat, ierr_e, ierr_r
+        type(ecp_pair)                       :: pair
 
         meu = 1.0; neu = 2.0; sigma_0 = 1.0; 
         imp_wat = .FALSE.; ierr_e = .FALSE.; ierr_r = .FALSE.
+        pot = 0.0; FIJ = 0.0; TORQ1 = 0.0; TORQ2 = 0.0;
+
         if (present(width)) then
             wf = width
             imp_wat = .TRUE.
@@ -675,20 +688,37 @@ module ecp
 
         if ( pair % rij_mag < ( sigma + cutoff + wf ) ) then
         
-            if (imp_wat) then
-                if ( pair % rij_mag < sigma ) then
-                    sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 )
-                else if ((pair % rij_mag .ge. sigma) .and. (pair % rij_mag .le. (sigma + wf))) then
-                    sr = sigma_0 / ( sigma - sigma + sigma_0 )
+            if( present(repulsive) .and. repulsive ) then
+
+                if ( pair % RIJ_MAG < sigma ) then
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+
+                    srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0) + 1.0
+                    srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
                 else
-                    sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 - wf )
+                    sr = 0.0
+                    srx_fac = 0.0
+                    srd_fac = 0.0
                 endif
+
             else
-                sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 )
-            endif
+
+                if (imp_wat) then
+                    if ( pair % RIJ_MAG < sigma ) then
+                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+                    else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
+                        sr = sigma_0 / ( sigma - sigma + sigma_0 )
+                    else
+                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
+                    endif
+                else
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+                endif
+
+                srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
+                srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
             
-            srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
-            srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
+            endif
 
             dR_dr = (1.0 / sigma_0) * (  ( pair % RIJ_hat )     + 0.5 * rfac * ( KR - dot_product( pair % RIJ_hat, KR ) * pair % RIJ_hat ) * phi ** (-3.0 / 2.0)  )
             de2_dr = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * efac * ( KE - dot_product( pair % RIJ_hat, KE ) * pair % RIJ_hat )
@@ -721,11 +751,6 @@ module ecp
                 TORQ2 = sx * TORQ2 - sdx * pot * factor
             endif
 
-        else
-            pot = 0.0
-            FIJ = 0.0
-            TORQ1 = 0.0
-            TORQ2 = 0.0
         endif
         
         PE = pot
@@ -806,29 +831,30 @@ module gay_berne_chiral
         
     end function dG_du2
 
-    pure subroutine gbc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality )
+    pure subroutine gbc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality, repulsive )
         implicit none
-        integer, intent(in)             :: I, J
+        integer, intent(in)                  :: I, J
         real(real64), intent(in)             :: cutoff
         real(real64), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
         real(real64), optional, intent(in)   :: width, chirality
-        
-        type(gb_parameters)             :: param
-        type(gb_pair)                   :: pair
+        logical, optional, intent(in)        :: repulsive
         
         real(real64), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2, U1XU2
         real(real64), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
         real(real64), dimension(3)           :: duur_dr, duur_du1, duur_du2, duu_du1, duu_du2
         real(real64), dimension(3)           :: FIJ, TI, TJ, TORQ1, TORQ2
         real(real64), dimension(3)           :: FIJ_chiral, TI_chiral, TJ_chiral, TORQ1_chiral, TORQ2_chiral
-
+        
         real(real64)                         :: meu, neu, uur, uu
         real(real64)                         :: eps1, eps2, sr, sr_cut, sigma, sigma_0
         real(real64)                         :: pot, pot_chiral, wf, ch_str
         real(real64)                         :: switch, xx, sx, sdx, factor, srx_fac, srd_fac
-        logical                         :: imp_wat
-
+        logical                              :: imp_wat
+        type(gb_parameters)                  :: param
+        type(gb_pair)                        :: pair
+        
         meu = 1.0; neu = 2.0; sigma_0 = 1.0; imp_wat = .FALSE.
+        pot = 0.0; FIJ = 0.0; TORQ1 = 0.0; TORQ2 = 0.0
 
         if (present(width)) then
             wf = width
@@ -884,22 +910,39 @@ module gay_berne_chiral
 
         if ( pair % RIJ_MAG < ( sigma + cutoff + wf ) ) then
 
-            if (imp_wat) then
-                if ( pair % RIJ_MAG < sigma ) then
+           if( present(repulsive) .and. repulsive ) then
+
+                if ( pair % RIJ_MAG .le. sigma ) then
                     sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
-                else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
-                    sr = sigma_0 / ( sigma - sigma + sigma_0 )
+
+                    srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0) + 1.0
+                    srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
                 else
-                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
+                    sr = 0.0
+                    srx_fac = 0.0
+                    srd_fac = 0.0
                 endif
+
             else
-                sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+
+                if (imp_wat) then
+                    if ( pair % RIJ_MAG < sigma ) then
+                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+                    else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
+                        sr = sigma_0 / ( sigma - sigma + sigma_0 )
+                    else
+                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
+                    endif
+                else
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+                endif
+
+                srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
+                srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
+            
             endif
 
             ! EVALUATE NORMAL GB POTENTIAL
-
-            srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
-            srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
 
             dR_dr   = (eps1 ** neu) * (eps2 ** meu) * (1.0 / sigma_0) * (( pair % RIJ / pair % RIJ_MAG ) + 0.5 * shape_x(I) * dG_dr( param % chi, param, pair ) * g_func( param % chi, param, pair ) ** (-3.0 / 2.0))
             de2_dr  = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * dG_dr( param % xhi, param, pair )
@@ -962,11 +1005,6 @@ module gay_berne_chiral
                 TORQ2 = sx * TORQ2 - sdx * pot * factor
             endif
 
-        else
-            pot = 0.0
-            FIJ = 0.0
-            TORQ1 = 0.0
-            TORQ2 = 0.0
         endif
 
         PE = pot
@@ -1145,37 +1183,39 @@ module ecp_chiral
         
     end function optim_dist
 
-    pure subroutine ecpc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality )
+    pure subroutine ecpc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality, repulsive )
         implicit none
-        integer, intent(in)             :: I, J
+        integer, intent(in)                  :: I, J
         real(real64), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
         real(real64), intent(in)             :: cutoff
         real(real64), optional, intent(in)   :: width, chirality
+        logical, optional, intent(in)        :: repulsive
 
-        type(ecp_pair) :: pair
-
-        real(real64), dimension(3, 3) :: U1, U2, S1, S2, E1, E2, EM
-        real(real64), dimension(3, 3) :: GE, GR, MM1, MM2
-        real(real64), dimension(3)    :: KE, KR, U1XU2
-        real(real64)                  :: lambda_E, lambda_R
-        real(real64)                  :: meu, neu, uur, uu
-
-        real(real64), dimension(3)    :: dR_dr, de2_dr
-        real(real64), dimension(3)    :: de1_du1x, de1_du1y, de1_du1z, de1_du1, de2_du1, dR_du1
-        real(real64), dimension(3)    :: de1_du2x, de1_du2y, de1_du2z, de1_du2, de2_du2, dR_du2
-        real(real64), dimension(3)    :: duur_dr, duur_du1z, duur_du2z, duur_du1, duur_du2
-        real(real64), dimension(3)    :: duu_du1z, duu_du2z, duu_du1, duu_du2
-        real(real64), dimension(3)    :: FIJ, TORQ1, TORQ2
-        real(real64), dimension(3)    :: FIJ_chiral, TORQ1_chiral, TORQ2_chiral
-
-        real(real64)                  :: eps1, eps2, sr, phi, sigma, sigma_0, ch_str
-        real(real64)                  :: e10, e20, sigma_t1, sigma_t2, sigma_t
-        real(real64)                  :: pot, wf, efac, rfac, srx_fac, srd_fac
-        real(real64)                  :: switch, xx, sx, sdx, factor, pot_chiral
-        logical                       :: imp_wat, ierr_e, ierr_r
+        real(real64), dimension(3, 3)        :: U1, U2, S1, S2, E1, E2, EM
+        real(real64), dimension(3, 3)        :: GE, GR, MM1, MM2
+        real(real64), dimension(3)           :: KE, KR, U1XU2
+        real(real64)                         :: lambda_E, lambda_R
+        real(real64)                         :: meu, neu, uur, uu
+        
+        real(real64), dimension(3)           :: dR_dr, de2_dr
+        real(real64), dimension(3)           :: de1_du1x, de1_du1y, de1_du1z, de1_du1, de2_du1, dR_du1
+        real(real64), dimension(3)           :: de1_du2x, de1_du2y, de1_du2z, de1_du2, de2_du2, dR_du2
+        real(real64), dimension(3)           :: duur_dr, duur_du1z, duur_du2z, duur_du1, duur_du2
+        real(real64), dimension(3)           :: duu_du1z, duu_du2z, duu_du1, duu_du2
+        real(real64), dimension(3)           :: FIJ, TORQ1, TORQ2
+        real(real64), dimension(3)           :: FIJ_chiral, TORQ1_chiral, TORQ2_chiral
+        
+        real(real64)                         :: eps1, eps2, sr, phi, sigma, sigma_0, ch_str
+        real(real64)                         :: e10, e20, sigma_t1, sigma_t2, sigma_t
+        real(real64)                         :: pot, wf, efac, rfac, srx_fac, srd_fac
+        real(real64)                         :: switch, xx, sx, sdx, factor, pot_chiral
+        logical                              :: imp_wat, ierr_e, ierr_r
+        type(ecp_pair)                       :: pair
 
         meu = 1.0; neu = 2.0; sigma_0 = 1.0; 
         imp_wat = .FALSE.; ierr_e = .FALSE.; ierr_r = .FALSE.
+        pot = 0.0; FIJ = 0.0; TORQ1 = 0.0; TORQ2 = 0.0;
+
         if (present(width)) then
             wf = width
             imp_wat = .TRUE.
@@ -1285,22 +1325,39 @@ module ecp_chiral
 
         if ( pair % rij_mag < ( sigma + cutoff + wf ) ) then
         
-            if (imp_wat) then
-                if ( pair % rij_mag < sigma ) then
-                    sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 )
-                else if ((pair % rij_mag .ge. sigma) .and. (pair % rij_mag .le. (sigma + wf))) then
-                    sr = sigma_0 / ( sigma - sigma + sigma_0 )
+           if( present(repulsive) .and. repulsive ) then
+
+                if ( pair % RIJ_MAG .le. sigma ) then
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+
+                    srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0) + 1.0
+                    srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
                 else
-                    sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 - wf )
+                    sr = 0.0
+                    srx_fac = 0.0
+                    srd_fac = 0.0
                 endif
+
             else
-                sr = sigma_0 / ( pair % rij_mag - sigma + sigma_0 )
+
+                if (imp_wat) then
+                    if ( pair % RIJ_MAG < sigma ) then
+                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+                    else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
+                        sr = sigma_0 / ( sigma - sigma + sigma_0 )
+                    else
+                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
+                    endif
+                else
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
+                endif
+
+                srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
+                srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
+            
             endif
 
             ! EVALUATE NORMAL ECP POTENTIAL
-            
-            srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
-            srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
 
             dR_dr = (1.0 / sigma_0) * (  ( pair % RIJ_hat )     + 0.5 * rfac * ( KR - dot_product( pair % RIJ_hat, KR ) * pair % RIJ_hat ) * phi ** (-3.0 / 2.0)  )
             de2_dr = (eps1 ** neu) * (meu * eps2 ** (meu - 1)) * efac * ( KE - dot_product( pair % RIJ_hat, KE ) * pair % RIJ_hat )
@@ -1374,11 +1431,6 @@ module ecp_chiral
                 TORQ2 = sx * TORQ2 - sdx * pot * factor
             endif
 
-        else
-            pot = 0.0
-            FIJ = 0.0
-            TORQ1 = 0.0
-            TORQ2 = 0.0
         endif
         
         PE = pot
@@ -1424,7 +1476,7 @@ module bonded_interactions
         fac1   = fac / CC22
         fac2   = fac / CC11
 
-        pot = -coeff * prefac * fac
+        pot = coeff * (1.0 - prefac * fac)  ! -prefac * fac is -cos(theta)
 
         FK = -coeff * prefac * ( fac1 * VJ - VI )
         FJ =  coeff * prefac * ( fac1 * VJ - fac2 * VI + VJ - VI )
@@ -1493,7 +1545,7 @@ module bonded_interactions
         fac1 = fac / DD23
         fac2 = fac / DD12
 
-        pot = coeff * prefac * fac
+        pot = coeff * (1.0 + prefac * fac) ! prefac * fac is -cos(phi)
 
         FL = -coeff * prefac * ( CC12 * VJ - CC22 * VI - fac1 * ( CC22 * VK- CC23 * VJ ) )
 
@@ -1532,6 +1584,7 @@ module bonded_interactions
         real(real64)                :: VI(3), VJ(3), FI(3), FJ(3), FK(3)
         real(real64)                :: CC11, CC12, CC22
         real(real64)                :: prefac, fac, fac1, fac2, pot
+        real(real64)                :: theta, theta_0, strength
 
         VI(1) = RX(J) - RX(I)
         VI(2) = RY(J) - RY(I)
@@ -1550,11 +1603,14 @@ module bonded_interactions
         fac1   = fac / CC22
         fac2   = fac / CC11
 
-        pot = -coeff * prefac * fac
+        theta_0  = PI - (PI / 180.0) * ang
+        theta    = acos(prefac * fac)
+        strength = coeff * ((theta - theta_0)) / sin(theta)
+        pot      = (coeff / 2.0) * (theta - theta_0) ** 2.0
 
-        FK = -coeff * prefac * ( fac1 * VJ - VI )
-        FJ =  coeff * prefac * ( fac1 * VJ - fac2 * VI + VJ - VI )
-        FI =  coeff * prefac * ( fac2 * VI - VJ )
+        FK = -strength * prefac * ( fac1 * VJ - VI )
+        FJ =  strength * prefac * ( fac1 * VJ - fac2 * VI + VJ - VI )
+        FI =  strength * prefac * ( fac2 * VI - VJ )
 
         potential_energy = potential_energy + pot
 
@@ -1571,6 +1627,88 @@ module bonded_interactions
         FZ(K) = FZ(K) + FK(3)
         
     end subroutine angle_bend_calculate_forces
+
+    subroutine angle_dih_calculate_forces( I, J, K, L, coeff, ang )
+        implicit none
+        integer, intent(in)         :: I, J, K, L
+        real(real64), intent(in)    :: coeff, ang
+        real(real64)                :: VI(3), VJ(3), VK(3), FI(3), FJ(3), FK(3), FL(3)
+        real(real64)                :: CC11, CC12, CC13, CC22, CC23, CC33
+        real(real64)                :: DD11, DD12, DD13, DD22, DD23, DD33
+        real(real64)                :: prefac, fac, fac1, fac2, fac3
+        real(real64)                :: pot, phi, phi_0, strength
+
+        VI(1) = RX(J) - RX(I)
+        VI(2) = RY(J) - RY(I)
+        VI(3) = RZ(J) - RZ(I)
+
+        VJ(1) = RX(K) - RX(J)
+        VJ(2) = RY(K) - RY(J)
+        VJ(3) = RZ(K) - RZ(J)
+
+        VK(1) = RX(L) - RX(K)
+        VK(2) = RY(L) - RY(K)
+        VK(3) = RZ(L) - RZ(K)
+
+        if (is_periodic) then
+            VI = VI - ANINT( VI / box_length ) * box_length
+            VJ = VJ - ANINT( VJ / box_length ) * box_length
+            VK = VK - ANINT( VK / box_length ) * box_length
+        endif
+
+        CC11 = dot( VI, VI )
+        CC12 = dot( VI, VJ )
+        CC13 = dot( VI, VK )
+        CC22 = dot( VJ, VJ )
+        CC23 = dot( VJ, VK )
+        CC33 = dot( VK, VK )
+
+        DD11 = CC11 * CC11 - CC11 ** 2.0
+        DD12 = CC11 * CC22 - CC12 ** 2.0
+        DD13 = CC11 * CC33 - CC13 ** 2.0
+        DD22 = CC22 * CC22 - CC22 ** 2.0
+        DD23 = CC22 * CC33 - CC23 ** 2.0
+        DD33 = CC33 * CC33 - CC33 ** 2.0
+
+        prefac = 1.0 / SQRT( DD23 * DD12 )
+        fac    = CC23 * CC12 - CC13 * CC22
+        fac1   = fac / DD23
+        fac2   = fac / DD12
+
+        phi_0    = (PI / 180.0) * ang
+        phi      = acos(prefac * fac)
+        strength = -coeff * sin(phi - phi_0) / sin(phi)
+        pot      = coeff * (1.0 - cos(phi - phi_0))
+
+        FL = -strength * prefac * ( CC12 * VJ - CC22 * VI - fac1 * ( CC22 * VK- CC23 * VJ ) )
+
+        FK = -strength * prefac * ( CC12 * VK - CC12 * VJ + CC23 * VI + CC22 * VI - 2.0 * CC13 * VJ &
+                        - fac2  * ( CC11 * VJ - CC12 * VI ) - fac1 * ( CC33 * VJ - CC22 * VK - CC23 * VK + CC23 * VJ ) )
+
+        FJ = -strength * prefac * ( -CC12 * VK + CC23 * VJ - CC23 * VI - CC22 * VK + 2.0 * CC13 * VJ &
+                        - fac2  * (  CC22 * VI - CC11 * VJ - CC12 * VJ + CC12 * VI ) - fac1 * ( -CC33 * VJ + CC23 * VK ) )
+
+        FI = -strength * prefac * ( -CC23 * VJ + CC22 * VK - fac2 * ( -CC22 * VI + CC12 * VJ ) )
+
+        potential_energy = potential_energy + pot
+
+        FX(I) = FX(I) + FI(1)
+        FY(I) = FY(I) + FI(2)
+        FZ(I) = FZ(I) + FI(3)
+
+        FX(J) = FX(J) + FJ(1)
+        FY(J) = FY(J) + FJ(2)
+        FZ(J) = FZ(J) + FJ(3)    
+
+        FX(K) = FX(K) + FK(1)
+        FY(K) = FY(K) + FK(2)
+        FZ(K) = FZ(K) + FK(3)
+
+        FX(L) = FX(L) + FL(1)
+        FY(L) = FY(L) + FL(2)
+        FZ(L) = FZ(L) + FL(3)
+
+    end subroutine angle_dih_calculate_forces
 
 end module bonded_interactions
 
