@@ -1722,7 +1722,6 @@ module constraints
         real(real64), intent(in)    :: DT
         real(real64)                :: RIJ(3), RIJ_old(3), DR(3)   
         real(real64)                :: L_ij, chi, vdot, r_tol, len
-        real(real64)                :: inv_mass_a, inv_mass_b
         integer                     :: I, J, IX, rattle, max_rattle = 100
         logical                     :: moved(N)
 
@@ -1736,9 +1735,6 @@ module constraints
                 I   = BBI(IX)
                 J   = BBJ(IX)
                 len = BB_len(IX)
-
-                inv_mass_a = 1.0 / mass(I)
-                inv_mass_b = 1.0 / mass(J)
                 
                 if ( moved(I) .or. moved(J) ) then
 
@@ -1770,25 +1766,25 @@ module constraints
                             stop
                         endif
 
-                        L_ij = chi / ( 2.0 * vdot * ( inv_mass_a + inv_mass_b ) )
+                        L_ij = chi / ( 2.0 * vdot * ( inv_mass(I) + inv_mass(J) ) )
 
                         virial = virial + ( L_ij * len ** 2 ) / DT ** 2
 
-                        RX(I) = RX(I) + ( L_ij * inv_mass_a ) * RIJ_old(1)
-                        RY(I) = RY(I) + ( L_ij * inv_mass_a ) * RIJ_old(2)
-                        RZ(I) = RZ(I) + ( L_ij * inv_mass_a ) * RIJ_old(3)
+                        RX(I) = RX(I) + ( L_ij * inv_mass(I) ) * RIJ_old(1)
+                        RY(I) = RY(I) + ( L_ij * inv_mass(I) ) * RIJ_old(2)
+                        RZ(I) = RZ(I) + ( L_ij * inv_mass(I) ) * RIJ_old(3)
 
-                        RX(J) = RX(J) - ( L_ij * inv_mass_b ) * RIJ_old(1)
-                        RY(J) = RY(J) - ( L_ij * inv_mass_b ) * RIJ_old(2)
-                        RZ(J) = RZ(J) - ( L_ij * inv_mass_b ) * RIJ_old(3)
+                        RX(J) = RX(J) - ( L_ij * inv_mass(J) ) * RIJ_old(1)
+                        RY(J) = RY(J) - ( L_ij * inv_mass(J) ) * RIJ_old(2)
+                        RZ(J) = RZ(J) - ( L_ij * inv_mass(J) ) * RIJ_old(3)
 
-                        VX(I) = VX(I) + ( L_ij * inv_mass_a ) * RIJ_old(1) / DT
-                        VY(I) = VY(I) + ( L_ij * inv_mass_a ) * RIJ_old(2) / DT
-                        VZ(I) = VZ(I) + ( L_ij * inv_mass_a ) * RIJ_old(3) / DT
+                        VX(I) = VX(I) + ( L_ij * inv_mass(I) ) * RIJ_old(1) / DT
+                        VY(I) = VY(I) + ( L_ij * inv_mass(I) ) * RIJ_old(2) / DT
+                        VZ(I) = VZ(I) + ( L_ij * inv_mass(I) ) * RIJ_old(3) / DT
 
-                        VX(J) = VX(J) - ( L_ij * inv_mass_b ) * RIJ_old(1) / DT
-                        VY(J) = VY(J) - ( L_ij * inv_mass_b ) * RIJ_old(2) / DT
-                        VZ(J) = VZ(J) - ( L_ij * inv_mass_b ) * RIJ_old(3) / DT
+                        VX(J) = VX(J) - ( L_ij * inv_mass(J) ) * RIJ_old(1) / DT
+                        VY(J) = VY(J) - ( L_ij * inv_mass(J) ) * RIJ_old(2) / DT
+                        VZ(J) = VZ(J) - ( L_ij * inv_mass(J) ) * RIJ_old(3) / DT
 
                         moved(i) = .TRUE.
                         moved(j) = .TRUE.
@@ -1812,7 +1808,6 @@ module constraints
         real(real64), intent(in)    :: DT
         real(real64)                :: RIJ(3), VIJ(3)
         real(real64)                :: L_ij, chi, vdot, r_tol, len
-        real(real64)                :: inv_mass_a, inv_mass_b
         integer                     :: I, J, IX, rattle, max_rattle = 100
         logical                     :: moved(N)
 
@@ -1826,9 +1821,6 @@ module constraints
                 I   = BBI(IX)
                 J   = BBJ(IX)
                 len = BB_len(IX)
-
-                inv_mass_a = 1.0 / mass(I)
-                inv_mass_b = 1.0 / mass(J)
 
                 if( moved(I) .or. moved(J) ) then
 
@@ -1845,19 +1837,19 @@ module constraints
                     VIJ(3) = VZ(I) - VZ(J)
 
                     vdot = dot( RIJ, VIJ )
-                    L_ij = -vdot / ( ( inv_mass_a + inv_mass_b ) * len**2 )
+                    L_ij = -vdot / ( ( inv_mass(I) + inv_mass(J) ) * len**2 )
                     
                     if (abs(L_ij) > r_tol) then
 
                         virial = virial + ( L_ij * len**2 ) / DT
 
-                        VX(I) = VX(I) + ( L_ij * inv_mass_a ) * RIJ(1)
-                        VY(I) = VY(I) + ( L_ij * inv_mass_a ) * RIJ(2)
-                        VZ(I) = VZ(I) + ( L_ij * inv_mass_a ) * RIJ(3)
+                        VX(I) = VX(I) + ( L_ij * inv_mass(I) ) * RIJ(1)
+                        VY(I) = VY(I) + ( L_ij * inv_mass(I) ) * RIJ(2)
+                        VZ(I) = VZ(I) + ( L_ij * inv_mass(I) ) * RIJ(3)
 
-                        VX(J) = VX(J) - ( L_ij * inv_mass_b ) * RIJ(1)
-                        VY(J) = VY(J) - ( L_ij * inv_mass_b ) * RIJ(2)
-                        VZ(J) = VZ(J) - ( L_ij * inv_mass_b ) * RIJ(3)
+                        VX(J) = VX(J) - ( L_ij * inv_mass(J) ) * RIJ(1)
+                        VY(J) = VY(J) - ( L_ij * inv_mass(J) ) * RIJ(2)
+                        VZ(J) = VZ(J) - ( L_ij * inv_mass(J) ) * RIJ(3)
 
                         moved(i) = .TRUE.
                         moved(j) = .TRUE.

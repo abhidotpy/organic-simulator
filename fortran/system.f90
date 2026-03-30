@@ -667,6 +667,11 @@ module system
         RX(to) = RX(from) + rot_offset(1)
         RY(to) = RY(from) + rot_offset(2)
         RZ(to) = RZ(from) + rot_offset(3)
+		
+		QW(to) = QW(from)
+        QX(to) = QX(from)
+        QY(to) = QY(from)
+        QZ(to) = QZ(from)
 
     end subroutine copy_transform
 
@@ -692,9 +697,9 @@ module system
         FY(to) = FY(to) + FY(from)
         FZ(to) = FZ(to) + FZ(from)
 
-        TX(to) = TX(to) + tij_to(1)
-        TY(to) = TY(to) + tij_to(2)
-        TZ(to) = TZ(to) + tij_to(3)
+        TX(to) = TX(to) + TX(from) + tij_to(1)
+        TY(to) = TY(to) + TY(from) + tij_to(2)
+        TZ(to) = TZ(to) + TZ(from) + tij_to(3)
 
         FX(from) = 0.0
         FY(from) = 0.0
