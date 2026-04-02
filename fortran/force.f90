@@ -13,6 +13,8 @@ module lennard_jones
         real(real64)                :: rij_sq, rcut_sq, sr2_lj, coeff
         real(real64)                :: pot, pot_cut, sr2_cut
 
+        PE = 0.0; FXIJ = 0.0
+
         RIJ(1) = RX(I) - RX(J)
         RIJ(2) = RY(I) - RY(J)
         RIJ(3) = RZ(I) - RZ(J)
@@ -36,10 +38,6 @@ module lennard_jones
 
             PE = pot - pot_cut
             FXIJ = coeff * RIJ / rij_sq
-        
-        else
-            PE = 0.0
-            FXIJ = 0.0
         endif
 
     end subroutine lj_calculate_forces
@@ -61,6 +59,7 @@ module lennard_jones12
         real(real64)               :: rij_sq, rcut_sq, sr2_lj, coeff
         real(real64)               :: pot, pot_cut, sr2_cut
 
+        PE = 0.0; FXIJ = 0.0
 
         RIJ(1) = RX(I) - RX(J)
         RIJ(2) = RY(I) - RY(J)
@@ -85,10 +84,6 @@ module lennard_jones12
 
             PE = pot - pot_cut
             FXIJ = coeff * RIJ / rij_sq
-
-        else
-            PE = 0.0
-            FXIJ = 0.0
         endif
 
     end subroutine lj12_calculate_forces
@@ -109,6 +104,7 @@ module wca
         real(real64)                    :: rij_sq, rcut_sq, sigma_sq, sr2_lj
         real(real64)                    :: coeff, pot
 
+        PE = 0.0; FXIJ = 0.0
 
         RIJ(1) = RX(I) - RX(J)
         RIJ(2) = RY(I) - RY(J)
@@ -120,7 +116,6 @@ module wca
 
         rij_sq = SUM( RIJ ** 2.0 )
         rcut_sq = cutoff ** 2.0
-        PE = 0.0; FXIJ = 0.0
 
         if (rij_sq < rcut_sq) then
             sigma_sq = ( (shape_z(I) + shape_z(J)) / 2.0 ) ** 2.0
@@ -151,6 +146,8 @@ module morse
         real(real64)               :: rij_mag, exp_term
         real(real64)               :: exp_cut, pot, pot_cut
 
+        PE = 0.0; FXIJ = 0.0
+
         RIJ(1) = RX(I) - RX(J)
         RIJ(2) = RY(I) - RY(J)
         RIJ(3) = RZ(I) - RZ(J)
@@ -170,10 +167,6 @@ module morse
 
             PE = pot - pot_cut
             FXIJ = -2.0 * width * dissoc * (1.0 - exp_term) * exp_term * RIJ / rij_mag
-
-        else
-            PE = 0.0
-            FXIJ = 0.0
         endif
 
     end subroutine morse_calculate_forces
@@ -262,7 +255,7 @@ module gay_berne
         real(real64), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
         real(real64), dimension(3)           :: FIJ, TI, TJ, TORQ1, TORQ2
         
-        real(real64)                         :: meu, neu
+        real(real64)                         :: meu, neu, epar, eprp
         real(real64)                         :: eps1, eps2, sr, sr_cut, sigma, sigma_0
         real(real64)                         :: pot, wf, srx_fac, srd_fac
         real(real64)                         :: switch, xx, sx, sdx, factor
@@ -272,6 +265,7 @@ module gay_berne
 
         meu = 1.0; neu = 2.0; sigma_0 = 1.0; imp_wat = .FALSE.
         pot = 0.0; FIJ = 0.0; TORQ1 = 0.0; TORQ2 = 0.0
+        epar = eshape_z(I) / eshape_z(I); eprp = eshape_x(I) / eshape_z(I)
 
         if (present(width)) then
             wf = width
@@ -306,7 +300,7 @@ module gay_berne
         param % ru2 = dot( pair % RIJ, pair % U2 )
         param % uu  = dot( pair % U1, pair % U2 )
         param % chi = ( shape_z(I) ** 2 - shape_x(I) ** 2 ) / ( shape_z(I) ** 2 + shape_x(I) ** 2 )
-        param % xhi = ( eshape_x(I) ** (1.0/meu) - eshape_z(I) ** (1.0/meu) ) / ( eshape_x(I) ** (1.0/meu) + eshape_z(I) ** (1.0/meu) )
+        param % xhi = ( eprp ** (1.0/meu) - epar ** (1.0/meu) ) / ( eprp ** (1.0/meu) + epar ** (1.0/meu) )
 
         eps1 = ( 1 - ( param % chi * param % uu ) ** 2) ** (-1.0 / 2.0)
         eps2 = g_func( param % xhi, param, pair )
@@ -831,13 +825,12 @@ module gay_berne_chiral
         
     end function dG_du2
 
-    pure subroutine gbc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality, repulsive )
+    pure subroutine gbc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality )
         implicit none
         integer, intent(in)                  :: I, J
         real(real64), intent(in)             :: cutoff
         real(real64), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
         real(real64), optional, intent(in)   :: width, chirality
-        logical, optional, intent(in)        :: repulsive
         
         real(real64), dimension(3)           :: dR_dr, de2_dr, dR_du1, dR_du2, U1XU2
         real(real64), dimension(3)           :: de1_du1, de2_du1, de1_du2, de2_du2
@@ -910,37 +903,20 @@ module gay_berne_chiral
 
         if ( pair % RIJ_MAG < ( sigma + cutoff + wf ) ) then
 
-           if( present(repulsive) .and. repulsive ) then
-
-                if ( pair % RIJ_MAG .le. sigma ) then
+            if (imp_wat) then
+                if ( pair % RIJ_MAG < sigma ) then
                     sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
-
-                    srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0) + 1.0
-                    srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
+                else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
+                    sr = sigma_0 / ( sigma - sigma + sigma_0 )
                 else
-                    sr = 0.0
-                    srx_fac = 0.0
-                    srd_fac = 0.0
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
                 endif
-
             else
-
-                if (imp_wat) then
-                    if ( pair % RIJ_MAG < sigma ) then
-                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
-                    else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
-                        sr = sigma_0 / ( sigma - sigma + sigma_0 )
-                    else
-                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
-                    endif
-                else
-                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
-                endif
-
-                srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
-                srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
-            
+                sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
             endif
+
+            srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
+            srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
 
             ! EVALUATE NORMAL GB POTENTIAL
 
@@ -1183,13 +1159,12 @@ module ecp_chiral
         
     end function optim_dist
 
-    pure subroutine ecpc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality, repulsive )
+    pure subroutine ecpc_calculate_forces( I, J, cutoff, PE, FXIJ, TXI, TXJ, width, chirality )
         implicit none
         integer, intent(in)                  :: I, J
         real(real64), intent(out)            :: PE, FXIJ(3), TXI(3), TXJ(3)
         real(real64), intent(in)             :: cutoff
         real(real64), optional, intent(in)   :: width, chirality
-        logical, optional, intent(in)        :: repulsive
 
         real(real64), dimension(3, 3)        :: U1, U2, S1, S2, E1, E2, EM
         real(real64), dimension(3, 3)        :: GE, GR, MM1, MM2
@@ -1324,38 +1299,21 @@ module ecp_chiral
         sdx = -30.0 * xx ** 4.0 + 60.0 * xx ** 3.0 - 30.0 * xx ** 2.0
 
         if ( pair % rij_mag < ( sigma + cutoff + wf ) ) then
-        
-           if( present(repulsive) .and. repulsive ) then
 
-                if ( pair % RIJ_MAG .le. sigma ) then
+            if (imp_wat) then
+                if ( pair % RIJ_MAG < sigma ) then
                     sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
-
-                    srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0) + 1.0
-                    srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
+                else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
+                    sr = sigma_0 / ( sigma - sigma + sigma_0 )
                 else
-                    sr = 0.0
-                    srx_fac = 0.0
-                    srd_fac = 0.0
+                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
                 endif
-
             else
-
-                if (imp_wat) then
-                    if ( pair % RIJ_MAG < sigma ) then
-                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
-                    else if ((pair % RIJ_MAG .ge. sigma) .and. (pair % RIJ_MAG .le. (sigma + wf))) then
-                        sr = sigma_0 / ( sigma - sigma + sigma_0 )
-                    else
-                        sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 - wf )
-                    endif
-                else
-                    sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
-                endif
-
-                srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
-                srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
-            
+                sr = sigma_0 / ( pair % RIJ_MAG - sigma + sigma_0 )
             endif
+
+            srx_fac = (sr ** 12.0 - 2.0 * sr ** 6.0)
+            srd_fac = (12.0 * sr**7 - 12.0 * sr**13)
 
             ! EVALUATE NORMAL ECP POTENTIAL
 
